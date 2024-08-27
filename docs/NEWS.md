@@ -1,3 +1,7 @@
+Flye 2.9.5 release (27 Aug 2024)
+===============================
+* Python 3.12 support, Python 2 dropped
+
 Flye 2.9.4 release (14 May 2024)
 ===============================
 * Minor technical changes
