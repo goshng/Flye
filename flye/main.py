@@ -35,6 +35,9 @@ import flye.utils.fasta_parser as fp
 from flye.repeat_graph.repeat_graph import RepeatGraph
 from flye.six.moves import range
 
+if sys.version_info[0] == 2:
+    raise Exception("Python 2 is unsupported")
+
 logger = logging.getLogger()
 
 class ResumeException(Exception):
