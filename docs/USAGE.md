@@ -202,6 +202,10 @@ It is sensitive to very short sequences and underrepresented organisms at low re
 
 For relatively complex single genomes, "regular" mode often outperforms metageomic mode.
 
+If you are using Flye / metaFlye to assemble heteroztgous bacterial genomes or metagenomes,
+you may consider using [strainy](https://github.com/katerinakazantseva/strainy) to
+call and quanitify heterozygosity and reveal collapsed strains.
+
 ### Haplotype mode
 
 By default, Flye (and metaFlye) collapses graph structures caused by
