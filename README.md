@@ -16,6 +16,10 @@ Currently, Flye will produce collapsed assemblies of diploid genomes,
 represented by a single mosaic haplotype. To recover two phased haplotypes
 consider applying [HapDup](https://github.com/fenderglass/hapdup) after the assembly.
 
+If you are using Flye / metaFlye to assemble heteroztgous bacterial genomes or metagenomes,
+you may consider using [strainy](https://github.com/katerinakazantseva/strainy) to
+call and quanitify heterozygosity and reveal collapsed strains.
+
 Manuals
 -------
 
