@@ -1,6 +1,6 @@
-#(c) 2016-2018 by Authors
-#This file is a part of Flye program.
-#Released under the BSD license (see LICENSE file)
+# (c) 2016-2018 by Authors
+# This file is a part of Flye program.
+# Released under the BSD license (see LICENSE file)
 
 
 from __future__ import absolute_import
@@ -51,8 +51,8 @@ def calc_mapping_rate(read_length, mapping_segments):
 def calc_mapping_rates(reads2contigs_mapping):
     mapping_rates = defaultdict(dict)
 
-    #read_paf_grouped assumes that hits are sorted in query order.
-    #It returns chunks of alignments for all (query, target) combinations
+    # read_paf_grouped assumes that hits are sorted in query order.
+    # It returns chunks of alignments for all (query, target) combinations
     for hit_group in read_paf_grouped(reads2contigs_mapping):
         map_segs = [MappingSegment(h.query_start, h.query_end) for h in hit_group]
         mapping_rate = calc_mapping_rate(hit_group[0].query_length, map_segs)
@@ -61,8 +61,9 @@ def calc_mapping_rates(reads2contigs_mapping):
     return mapping_rates
 
 
-def extract_unmapped_reads(args, reads2contigs_mapping, unmapped_reads_path,
-                           mapping_rate_threshold):
+def extract_unmapped_reads(
+    args, reads2contigs_mapping, unmapped_reads_path, mapping_rate_threshold
+):
     mapping_rates = calc_mapping_rates(reads2contigs_mapping)
     total_bases = 0
     unmapped_bases = 0
@@ -84,5 +85,9 @@ def extract_unmapped_reads(args, reads2contigs_mapping, unmapped_reads_path,
                     unmapped_bases += len(sequence)
                     fout.write(">{0}\n{1}\n".format(hdr, sequence))
 
-    logger.debug("Unmapped sequence: %d / %d (%f)", unmapped_bases,
-                 total_bases, unmapped_bases / total_bases)
+    logger.debug(
+        "Unmapped sequence: %d / %d (%f)",
+        unmapped_bases,
+        total_bases,
+        unmapped_bases / total_bases,
+    )

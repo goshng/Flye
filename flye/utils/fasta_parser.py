@@ -1,6 +1,6 @@
-#(c) 2013-2016 by Authors
-#This file is a part of ABruijn program.
-#Released under the BSD license (see LICENSE file)
+# (c) 2013-2016 by Authors
+# This file is a part of ABruijn program.
+# Released under the BSD license (see LICENSE file)
 
 """
 This module provides some basic FASTA I/O
@@ -12,10 +12,11 @@ import gzip
 import io
 import sys
 
-#In Python2, everything is bytes (=str)
-#In Python3, we are doing IO in bytes, but everywhere else strngs = unicode
+# In Python2, everything is bytes (=str)
+# In Python3, we are doing IO in bytes, but everywhere else strngs = unicode
 if sys.version_info < (3, 0):
     from string import maketrans
+
     _STR = lambda x: x
     _BYTES = lambda x: x
 else:
@@ -33,7 +34,8 @@ class FastaError(Exception):
     pass
 
 
-#Imported functions: take and return unicode strings
+# Imported functions: take and return unicode strings
+
 
 def read_sequence_dict(filename):
     """
@@ -59,21 +61,19 @@ def stream_sequence(filename):
         if not gzipped:
             handle = open(filename, "rb")
         else:
-            #handle = os.popen("gunzip -c {0}".format(filename))
+            # handle = os.popen("gunzip -c {0}".format(filename))
             gz = gzip.open(filename, "rb")
             handle = io.BufferedReader(gz)
 
         if fastq:
             for hdr, seq, _ in _read_fastq(handle):
                 if not _validate_seq(seq):
-                    raise FastaError("Invalid char while reading {0}"
-                                     .format(filename))
+                    raise FastaError("Invalid char while reading {0}".format(filename))
                 yield _STR(hdr), _STR(_to_acgt_bytes(seq))
         else:
             for hdr, seq in _read_fasta(handle):
                 if not _validate_seq(seq):
-                    raise FastaError("Invalid char while reading {0}"
-                                     .format(filename))
+                    raise FastaError("Invalid char while reading {0}".format(filename))
                 yield _STR(hdr), _STR(_to_acgt_bytes(seq))
 
     except IOError as e:
@@ -89,7 +89,7 @@ def write_fasta_dict(fasta_dict, filename):
             f.write(">{0}\n".format(header))
 
             for i in range(0, len(fasta_dict[header]), 60):
-                f.write(fasta_dict[header][i:i + 60] + "\n")
+                f.write(fasta_dict[header][i : i + 60] + "\n")
 
 
 def reverse_complement(unicode_str):
@@ -98,15 +98,19 @@ def reverse_complement(unicode_str):
 
 def reverse_complement_bytes(bytes_str):
     return bytes_str.translate(reverse_complement_bytes.COMPL)[::-1]
-reverse_complement_bytes.COMPL = maketrans(b"ATGCURYKMSWBVDHNXatgcurykmswbvdhnx",
-                                           b"TACGAYRMKSWVBHDNXtacgayrmkswvbhdnx")
+
+
+reverse_complement_bytes.COMPL = maketrans(
+    b"ATGCURYKMSWBVDHNXatgcurykmswbvdhnx", b"TACGAYRMKSWVBHDNXtacgayrmkswvbhdnx"
+)
 
 
 def to_acgt(unicode_str):
     return _STR(_to_acgt_bytes(_BYTES(unicode_str)))
 
 
-#Internal functions: use bytes for faster operations
+# Internal functions: use bytes for faster operations
+
 
 def _is_fastq(filename):
     suffix = filename.rsplit(".")[-1]
@@ -166,18 +170,20 @@ def _read_fastq(file_handle):
             continue
 
         if state_counter == 0:
-            if line[0 : 1] != b"@":
-                raise FastaError("Fastq format error: {0} at line {1}"
-                                    .format(file_handle.name, no))
+            if line[0:1] != b"@":
+                raise FastaError(
+                    "Fastq format error: {0} at line {1}".format(file_handle.name, no)
+                )
             header = line[1:].split()[0]
 
         if state_counter == 1:
             seq = line
 
         if state_counter == 2:
-            if line[0 : 1] != b"+":
-                raise FastaError("Fastq format error: {0} at line {1}"
-                                    .format(file_handle.name, no))
+            if line[0:1] != b"+":
+                raise FastaError(
+                    "Fastq format error: {0} at line {1}".format(file_handle.name, no)
+                )
 
         if state_counter == 3:
             qual = line
@@ -190,11 +196,13 @@ def _validate_seq(sequence):
     """
     sequence : bytes
     """
-    #if len(sequence.strip(_validate_seq.VALID_CHARS)) > 0:
+    # if len(sequence.strip(_validate_seq.VALID_CHARS)) > 0:
     #    return False
     if len(sequence.translate(None, _validate_seq.VALID_CHARS)):
         return False
     return True
+
+
 _validate_seq.VALID_CHARS = b"ACGTURYKMSWBDHVNXatgcurykmswbvdhnx"
 
 
@@ -205,15 +213,20 @@ def _to_acgt_bytes(dna_str):
     """
     if len(dna_str.translate(None, _to_acgt_bytes.ACGT_CHARS)) == 0:
         return dna_str
-    #if len(dna_str.strip(_to_acgt_bytes.ACGT_CHARS)) == 0:
+    # if len(dna_str.strip(_to_acgt_bytes.ACGT_CHARS)) == 0:
     #    return dna_str
     else:
         if not _to_acgt_bytes.ACGT_WARN:
             _to_acgt_bytes.ACGT_WARN = True
-            logger.warning("Input contain non-ACGT characters - "
-                           "they will be converted to arbitrary ACGTs")
+            logger.warning(
+                "Input contain non-ACGT characters - "
+                "they will be converted to arbitrary ACGTs"
+            )
         return dna_str.translate(_to_acgt_bytes.TO_ACGT)
+
+
 _to_acgt_bytes.ACGT_WARN = False
 _to_acgt_bytes.ACGT_CHARS = b"ACGTacgt"
-_to_acgt_bytes.TO_ACGT = maketrans(b"URYKMSWBVDHNXurykmswbvdhnx",
-                                   b"ACGTACGTACGTAacgtacgtacgta")
+_to_acgt_bytes.TO_ACGT = maketrans(
+    b"URYKMSWBVDHNXurykmswbvdhnx", b"ACGTACGTACGTAacgtacgtacgta"
+)

@@ -1,6 +1,6 @@
-#(c) 2016 by Authors
-#This file is a part of ABruijn program.
-#Released under the BSD license (see LICENSE file)
+# (c) 2016 by Authors
+# This file is a part of ABruijn program.
+# Released under the BSD license (see LICENSE file)
 
 """
 Quick and dirty alignment consensus
@@ -41,13 +41,16 @@ def _thread_worker(aln_reader, chunk_feeder, platform, results_queue, error_queu
             ctg_region = chunk_feeder.get_chunk()
             if ctg_region is None:
                 break
-            ctg_aln = aln_reader.get_alignments(ctg_region.ctg_id, ctg_region.start,
-                                                ctg_region.end)
+            ctg_aln = aln_reader.get_alignments(
+                ctg_region.ctg_id, ctg_region.start, ctg_region.end
+            )
             ctg_id = ctg_region.ctg_id
             if len(ctg_aln) == 0:
                 continue
 
-            ctg_aln = aln_reader.trim_and_transpose(ctg_aln, ctg_region.start, ctg_region.end)
+            ctg_aln = aln_reader.trim_and_transpose(
+                ctg_aln, ctg_region.start, ctg_region.end
+            )
             ctg_aln, _mean_cov = get_uniform_alignments(ctg_aln)
 
             profile, aln_errors = _contig_profile(ctg_aln, platform)
@@ -60,8 +63,7 @@ def _thread_worker(aln_reader, chunk_feeder, platform, results_queue, error_queu
         error_queue.put(e)
 
 
-def get_consensus(alignment_path, contigs_path, contigs_info, num_proc,
-                  platform):
+def get_consensus(alignment_path, contigs_path, contigs_info, num_proc, platform):
     """
     Main function
     """
@@ -69,17 +71,24 @@ def get_consensus(alignment_path, contigs_path, contigs_info, num_proc,
     CHUNK_SIZE = 1000000
     contigs_fasta = fp.read_sequence_dict(contigs_path)
     mp_manager = multiprocessing.Manager()
-    aln_reader = SynchronizedSamReader(alignment_path, contigs_fasta, mp_manager,
-                                       max_coverage=cfg.vals["max_read_coverage"],
-                                       use_secondary=True)
+    aln_reader = SynchronizedSamReader(
+        alignment_path,
+        contigs_fasta,
+        mp_manager,
+        max_coverage=cfg.vals["max_read_coverage"],
+        use_secondary=True,
+    )
     chunk_feeder = SynchonizedChunkManager(contigs_fasta, mp_manager, CHUNK_SIZE)
 
-    #manager = multiprocessing.Manager()
+    # manager = multiprocessing.Manager()
     results_queue = mp_manager.Queue()
     error_queue = mp_manager.Queue()
 
-    process_in_parallel(_thread_worker, (aln_reader, chunk_feeder,
-                            platform, results_queue, error_queue), num_proc)
+    process_in_parallel(
+        _thread_worker,
+        (aln_reader, chunk_feeder, platform, results_queue, error_queue),
+        num_proc,
+    )
 
     if not error_queue.empty():
         raise error_queue.get()
@@ -115,13 +124,13 @@ def _contig_profile(alignment, platform):
 
     aln_errors = []
     profile = [Profile() for _ in range(genome_len)]
-    #max_aln_err = cfg.vals["err_modes"][platform]["max_aln_error"]
+    # max_aln_err = cfg.vals["err_modes"][platform]["max_aln_error"]
     for aln in alignment:
-        #if aln.err_rate > max_aln_err: continue
+        # if aln.err_rate > max_aln_err: continue
         aln_errors.append(aln.err_rate)
 
-        #after gap shifting it is possible that
-        #two gaps are aligned against each other
+        # after gap shifting it is possible that
+        # two gaps are aligned against each other
         qry_seq = shift_gaps(aln.trg_seq, aln.qry_seq)
         trg_seq = shift_gaps(qry_seq, aln.trg_seq)
 
@@ -132,7 +141,7 @@ def _contig_profile(alignment, platform):
             if trg_pos >= genome_len:
                 trg_pos -= genome_len
 
-            #total += 1
+            # total += 1
             prof_elem = profile[trg_pos]
             if trg_nuc == "-" and qry_nuc != "-":
                 prof_elem.insertions[aln.qry_id] += qry_nuc
@@ -142,10 +151,10 @@ def _contig_profile(alignment, platform):
 
             trg_pos += 1
 
-    #print "len", genome_len, "median coverage", cov_threshold
-    #print "total bases: ", total, "discarded bases: ", discarded
-    #print "filtered", float(discarded) / total
-    #print ""
+    # print "len", genome_len, "median coverage", cov_threshold
+    # print "total bases: ", total, "discarded bases: ", discarded
+    # print "filtered", float(discarded) / total
+    # print ""
 
     return profile, aln_errors
 
@@ -175,7 +184,9 @@ def _flatten_profile(profile):
             max_insert = max(sorted(ins_group), key=ins_group.get)
 
         is_deletion = max_match == "-" or del_num > match_and_del_num // 3
-        is_insertion = max_insert and max_insert != "-" and num_ins > match_and_del_num // 3
+        is_insertion = (
+            max_insert and max_insert != "-" and num_ins > match_and_del_num // 3
+        )
 
         if not is_deletion:
             growing_seq.append(max_match)

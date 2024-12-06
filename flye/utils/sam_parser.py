@@ -1,6 +1,6 @@
-#(c) 2019 by Authors
-#This file is a part of Flye program.
-#Released under the BSD license (see LICENSE file)
+# (c) 2019 by Authors
+# This file is a part of Flye program.
+# Released under the BSD license (see LICENSE file)
 
 """
 Provides multithreaded parser for SAM files
@@ -21,10 +21,11 @@ import time
 import random
 from copy import copy
 
-#In Python2, everything is bytes (=str)
-#In Python3, we are doing IO in bytes, but everywhere else strngs = unicode
+# In Python2, everything is bytes (=str)
+# In Python3, we are doing IO in bytes, but everywhere else strngs = unicode
 if sys.version_info < (3, 0):
     from string import maketrans
+
     _STR = lambda x: x
     _BYTES = lambda x: x
 else:
@@ -41,11 +42,27 @@ from flye.utils.utils import get_median
 logger = logging.getLogger()
 
 SAMTOOLS_BIN = "flye-samtools"
-Alignment = namedtuple("Alignment", ["qry_id", "trg_id", "qry_start", "qry_end",
-                                     "qry_sign", "qry_len", "trg_start",
-                                     "trg_end", "trg_sign", "trg_len",
-                                     "qry_seq", "trg_seq", "err_rate",
-                                     "is_secondary", "is_supplementary", "map_qv"])
+Alignment = namedtuple(
+    "Alignment",
+    [
+        "qry_id",
+        "trg_id",
+        "qry_start",
+        "qry_end",
+        "qry_sign",
+        "qry_len",
+        "trg_start",
+        "trg_end",
+        "trg_sign",
+        "trg_len",
+        "qry_seq",
+        "trg_seq",
+        "err_rate",
+        "is_secondary",
+        "is_supplementary",
+        "map_qv",
+    ],
+)
 
 
 ContigRegion = namedtuple("ContigRegion", ["ctg_id", "start", "end"])
@@ -59,8 +76,18 @@ class PafHit(object):
     """
     Stores paf alignment
     """
-    __slots__ = ("query", "query_length", "query_start", "query_end",
-                 "target", "target_length", "target_start", "target_end")
+
+    __slots__ = (
+        "query",
+        "query_length",
+        "query_start",
+        "query_end",
+        "target",
+        "target_length",
+        "target_start",
+        "target_end",
+    )
+
     def __init__(self, raw_hit):
         hit = raw_hit.split()
 
@@ -129,13 +156,14 @@ class SynchonizedChunkManager(object):
     Stores the list of reference segments / chunks and can
     return them in multiple threds
     """
+
     def __init__(self, reference_fasta, multiproc_manager, chunk_size=None):
-        #prepare list of chunks to read
+        # prepare list of chunks to read
         self.fetch_list = []
         self.chunk_size = chunk_size
 
-        #will be shared between processes
-        #self.shared_manager = multiprocessing.Manager()
+        # will be shared between processes
+        # self.shared_manager = multiprocessing.Manager()
         self.shared_num_jobs = multiprocessing.Value(ctypes.c_int, 0)
         if multiproc_manager:
             self.shared_lock = multiproc_manager.Lock()
@@ -143,7 +171,6 @@ class SynchonizedChunkManager(object):
         else:
             self.shared_lock = None
             self.shared_eof = ctypes.c_bool(False)
-
 
         for ctg_id in reference_fasta:
             ctg_len = len(reference_fasta[ctg_id])
@@ -154,7 +181,7 @@ class SynchonizedChunkManager(object):
                 if ctg_len - reg_end < chunk_size:
                     reg_end = ctg_len
                 self.fetch_list.append(ContigRegion(ctg_id, reg_start, reg_end))
-                #logger.debug("Region: {0} {1} {2}".format(ctg_id, reg_start, reg_end))
+                # logger.debug("Region: {0} {1} {2}".format(ctg_id, reg_start, reg_end))
 
         if len(self.fetch_list) == 0:
             self.shared_eof.value = True
@@ -172,7 +199,7 @@ class SynchonizedChunkManager(object):
                 if self.shared_lock:
                     self.shared_lock.release()
                 return None
-            
+
             job_id = self.shared_num_jobs.value
             self.shared_num_jobs.value = self.shared_num_jobs.value + 1
             if self.shared_num_jobs.value == len(self.fetch_list):
@@ -193,23 +220,32 @@ class SynchronizedSamReader(object):
     """
     Parses SAM file in multiple threads.
     """
-    def __init__(self, sam_alignment, reference_fasta, multiproc_manager,
-                 max_coverage=None, use_secondary=False):
-        #check that alignment exists
+
+    def __init__(
+        self,
+        sam_alignment,
+        reference_fasta,
+        multiproc_manager,
+        max_coverage=None,
+        use_secondary=False,
+    ):
+        # check that alignment exists
         if not os.path.exists(sam_alignment):
             raise AlignmentException("Can't open {0}".format(sam_alignment))
         if not os.path.exists(sam_alignment + ".bai"):
             raise AlignmentException("Bam not indexed: {0}".format(sam_alignment))
 
-        #will not be changed during exceution, each process has its own copy
+        # will not be changed during exceution, each process has its own copy
         self.aln_path = sam_alignment
         self.max_coverage = max_coverage
         self.use_secondary = use_secondary
         self.cigar_parser = re.compile(b"[0-9]+[MIDNSHP=X]")
 
-        #self.shared_manager = multiprocessing.Manager()
-        self.ref_fasta = dict() if multiproc_manager == None else multiproc_manager.dict()
-        for (h, s) in iteritems(reference_fasta):
+        # self.shared_manager = multiprocessing.Manager()
+        self.ref_fasta = (
+            dict() if multiproc_manager == None else multiproc_manager.dict()
+        )
+        for h, s in iteritems(reference_fasta):
             self.ref_fasta[_BYTES(h)] = _BYTES(s)
 
     def get_region_sequence(self, region_id, region_start=None, region_end=None):
@@ -223,7 +259,7 @@ class SynchronizedSamReader(object):
         return _STR(contig_str[region_start:region_end])
 
     def _parse_cigar(self, cigar_str, read_str, ctg_str, ctg_pos):
-        #ctg_str = self.ref_fasta[ctg_name]
+        # ctg_str = self.ref_fasta[ctg_name]
         trg_seq = []
         qry_seq = []
         trg_start = ctg_pos - 1
@@ -284,8 +320,17 @@ class SynchronizedSamReader(object):
         qry_start += soft_clipped_left
         qry_end -= soft_clipped_right
 
-        return (trg_start, trg_end, len(ctg_str), trg_seq,
-                qry_start, qry_end, qry_len, qry_seq, err_rate)
+        return (
+            trg_start,
+            trg_end,
+            len(ctg_str),
+            trg_seq,
+            qry_start,
+            qry_end,
+            qry_len,
+            qry_seq,
+            err_rate,
+        )
 
     def trim_and_transpose(_self, alignmens, region_start, region_end):
         """
@@ -300,7 +345,7 @@ class SynchronizedSamReader(object):
                 trimmed_aln.append(copy(aln))
                 continue
 
-            #trimming from left
+            # trimming from left
             new_qry_start = aln.qry_start
             new_trg_start = aln.trg_start
             left_offset = None
@@ -312,7 +357,7 @@ class SynchronizedSamReader(object):
                 if aln.qry_seq[left_offset] != "-":
                     new_qry_start += 1
 
-            #trimming from right
+            # trimming from right
             new_qry_end = aln.qry_end
             new_trg_end = aln.trg_end
             right_offset = None
@@ -327,21 +372,30 @@ class SynchronizedSamReader(object):
             if new_trg_end - new_qry_end > MIN_ALN:
                 new_qry_seq = aln.qry_seq[left_offset : len(aln.qry_seq) - right_offset]
                 new_trg_seq = aln.trg_seq[left_offset : len(aln.trg_seq) - right_offset]
-                trimmed_aln.append(aln._replace(qry_start=new_qry_start, qry_end=new_qry_end,
-                                                trg_start=new_trg_start, trg_end=new_trg_end,
-                                                qry_seq=new_qry_seq, trg_seq=new_trg_seq))
+                trimmed_aln.append(
+                    aln._replace(
+                        qry_start=new_qry_start,
+                        qry_end=new_qry_end,
+                        trg_start=new_trg_start,
+                        trg_end=new_trg_end,
+                        qry_seq=new_qry_seq,
+                        trg_seq=new_trg_seq,
+                    )
+                )
 
-            #print("Aln trg", aln.trg_start, aln.trg_end, "qry", aln.qry_start, aln.qry_end)
-            #print("Left offset", left_offset, "right offset", right_offset)
-            #print("New aln", new_trg_start, new_trg_end, new_qry_start, new_qry_end)
-            #print("")
+            # print("Aln trg", aln.trg_start, aln.trg_end, "qry", aln.qry_start, aln.qry_end)
+            # print("Left offset", left_offset, "right offset", right_offset)
+            # print("New aln", new_trg_start, new_trg_end, new_qry_start, new_qry_end)
+            # print("")
 
         for i, aln in enumerate(trimmed_aln):
-            trimmed_aln[i] = aln._replace(trg_start=aln.trg_start - region_start,
-                                          trg_end=aln.trg_end - region_start,
-                                          trg_len=region_end - region_start)
+            trimmed_aln[i] = aln._replace(
+                trg_start=aln.trg_start - region_start,
+                trg_end=aln.trg_end - region_start,
+                trg_len=region_end - region_start,
+            )
 
-        #print(len(alignmens), len(trimmed_aln))
+        # print(len(alignmens), len(trimmed_aln))
 
         return trimmed_aln
 
@@ -353,10 +407,17 @@ class SynchronizedSamReader(object):
         if region_end is None:
             region_end = len(contig_str)
 
-        samtools_out = subprocess.Popen("{0} depth {1} -r '{2}:{3}-{4}' -a -m 0 -Q 10 -l 100"
-                                        .format(SAMTOOLS_BIN, self.aln_path,
-                                                _STR(parsed_contig), region_start, region_end),
-                                        shell=True, stdout=subprocess.PIPE).stdout
+        samtools_out = subprocess.Popen(
+            "{0} depth {1} -r '{2}:{3}-{4}' -a -m 0 -Q 10 -l 100".format(
+                SAMTOOLS_BIN,
+                self.aln_path,
+                _STR(parsed_contig),
+                region_start,
+                region_end,
+            ),
+            shell=True,
+            stdout=subprocess.PIPE,
+        ).stdout
         all_cov_pos = []
         for line in samtools_out:
             _ctg, _pos, coverage = line.split()
@@ -371,19 +432,26 @@ class SynchronizedSamReader(object):
             region_start = 0
         if region_end is None:
             region_end = len(contig_str)
-        #logger.debug("Reading region: {0} {1} {2}".format(region_id, region_start, region_end))
+        # logger.debug("Reading region: {0} {1} {2}".format(region_id, region_start, region_end))
 
-        aln_file = subprocess.Popen("{0} view {1} '{2}:{3}-{4}'"
-                                        .format(SAMTOOLS_BIN, self.aln_path,
-                                                _STR(parsed_contig), region_start, region_end),
-                                    shell=True, stdout=subprocess.PIPE).stdout
+        aln_file = subprocess.Popen(
+            "{0} view {1} '{2}:{3}-{4}'".format(
+                SAMTOOLS_BIN,
+                self.aln_path,
+                _STR(parsed_contig),
+                region_start,
+                region_end,
+            ),
+            shell=True,
+            stdout=subprocess.PIPE,
+        ).stdout
 
         chunk_buffer = []
         for line in aln_file:
             chunk_buffer.append(line)
 
-        #shuffle alignments so that they uniformly distributed. Needed for
-        #max_coverage subsampling. Using the same seed for determinism
+        # shuffle alignments so that they uniformly distributed. Needed for
+        # max_coverage subsampling. Using the same seed for determinism
         random.Random(42).shuffle(chunk_buffer)
 
         ###
@@ -393,7 +461,7 @@ class SynchronizedSamReader(object):
         for line in chunk_buffer:
             tokens = line.strip().split()
             if len(tokens) < 11:
-                #raise AlignmentException("Error reading SAM file")
+                # raise AlignmentException("Error reading SAM file")
                 continue
 
             flags = int(tokens[1])
@@ -402,8 +470,10 @@ class SynchronizedSamReader(object):
             is_supplementary = flags & 0x800
             is_reversed = flags & 0x16
 
-            if is_unmapped: continue
-            if is_secondary and not self.use_secondary: continue
+            if is_unmapped:
+                continue
+            if is_secondary and not self.use_secondary:
+                continue
 
             read_id = tokens[0]
             cigar_str = tokens[5]
@@ -413,40 +483,64 @@ class SynchronizedSamReader(object):
 
             if read_str == b"*":
                 continue
-                #raise Exception("Error parsing SAM: record without read sequence")
+                # raise Exception("Error parsing SAM: record without read sequence")
 
-            (trg_start, trg_end, trg_len, trg_seq,
-            qry_start, qry_end, qry_len, qry_seq, err_rate) = \
-                    self._parse_cigar(cigar_str, read_str, contig_str, ctg_pos)
+            (
+                trg_start,
+                trg_end,
+                trg_len,
+                trg_seq,
+                qry_start,
+                qry_end,
+                qry_len,
+                qry_seq,
+                err_rate,
+            ) = self._parse_cigar(cigar_str, read_str, contig_str, ctg_pos)
 
-            #OVERHANG = cfg.vals["read_aln_overhang"]
-            #if (float(qry_end - qry_start) / qry_len > self.min_aln_rate or
+            # OVERHANG = cfg.vals["read_aln_overhang"]
+            # if (float(qry_end - qry_start) / qry_len > self.min_aln_rate or
             #        trg_start < OVERHANG or trg_len - trg_end < OVERHANG):
-            aln = Alignment(_STR(read_id), _STR(parsed_contig),
-                            qry_start, qry_end, "-" if is_reversed else "+", qry_len,
-                            trg_start, trg_end, "+", trg_len,
-                            _STR(qry_seq), _STR(trg_seq), err_rate,
-                            is_secondary, is_supplementary, map_qv)
+            aln = Alignment(
+                _STR(read_id),
+                _STR(parsed_contig),
+                qry_start,
+                qry_end,
+                "-" if is_reversed else "+",
+                qry_len,
+                trg_start,
+                trg_end,
+                "+",
+                trg_len,
+                _STR(qry_seq),
+                _STR(trg_seq),
+                err_rate,
+                is_secondary,
+                is_supplementary,
+                map_qv,
+            )
             alignments.append(aln)
 
             sequence_length += qry_end - qry_start
             if sequence_length // len(contig_str) > self.max_coverage:
                 break
 
-        #finally, sort alignments by read and by score
+        # finally, sort alignments by read and by score
         alignments.sort(key=lambda a: (a.qry_id, -(a.qry_end - a.qry_start)))
 
         return alignments
 
     def get_all_alignments(self):
-        aln_file = subprocess.Popen("{0} view {1}".format(SAMTOOLS_BIN, self.aln_path),
-                                    shell=True, stdout=subprocess.PIPE).stdout
+        aln_file = subprocess.Popen(
+            "{0} view {1}".format(SAMTOOLS_BIN, self.aln_path),
+            shell=True,
+            stdout=subprocess.PIPE,
+        ).stdout
 
         alignments = []
         for line in aln_file:
             tokens = line.strip().split()
             if len(tokens) < 11:
-                #raise AlignmentException("Error reading SAM file")
+                # raise AlignmentException("Error reading SAM file")
                 continue
 
             flags = int(tokens[1])
@@ -455,8 +549,10 @@ class SynchronizedSamReader(object):
             is_supplementary = flags & 0x800
             is_reversed = flags & 0x16
 
-            if is_unmapped: continue
-            if is_secondary and not self.use_secondary: continue
+            if is_unmapped:
+                continue
+            if is_secondary and not self.use_secondary:
+                continue
 
             read_id = tokens[0]
             parsed_contig = tokens[2]
@@ -467,23 +563,44 @@ class SynchronizedSamReader(object):
 
             if read_str == b"*":
                 continue
-                #raise Exception("Error parsing SAM: record without read sequence")
+                # raise Exception("Error parsing SAM: record without read sequence")
 
             contig_str = self.ref_fasta[parsed_contig]
 
-            (trg_start, trg_end, trg_len, trg_seq,
-            qry_start, qry_end, qry_len, qry_seq, err_rate) = \
-                    self._parse_cigar(cigar_str, read_str, contig_str, ctg_pos)
+            (
+                trg_start,
+                trg_end,
+                trg_len,
+                trg_seq,
+                qry_start,
+                qry_end,
+                qry_len,
+                qry_seq,
+                err_rate,
+            ) = self._parse_cigar(cigar_str, read_str, contig_str, ctg_pos)
 
-            aln = Alignment(_STR(read_id), _STR(parsed_contig),
-                            qry_start, qry_end, "-" if is_reversed else "+", qry_len,
-                            trg_start, trg_end, "+", trg_len,
-                            _STR(qry_seq), _STR(trg_seq), err_rate,
-                            is_secondary, is_supplementary, map_qv)
+            aln = Alignment(
+                _STR(read_id),
+                _STR(parsed_contig),
+                qry_start,
+                qry_end,
+                "-" if is_reversed else "+",
+                qry_len,
+                trg_start,
+                trg_end,
+                "+",
+                trg_len,
+                _STR(qry_seq),
+                _STR(trg_seq),
+                err_rate,
+                is_secondary,
+                is_supplementary,
+                map_qv,
+            )
             alignments.append(aln)
 
         return alignments
 
 
-#def _is_sam_header(line):
+# def _is_sam_header(line):
 #    return line[:3] in [b"@PG", b"@HD", b"@SQ", b"@RG", b"@CO"]

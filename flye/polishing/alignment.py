@@ -1,6 +1,6 @@
-#(c) 2016 by Authors
-#This file is a part of ABruijn program.
-#Released under the BSD license (see LICENSE file)
+# (c) 2016 by Authors
+# This file is a part of ABruijn program.
+# Released under the BSD license (see LICENSE file)
 
 """
 Runs Minimap2 and parses its output
@@ -38,8 +38,9 @@ def check_binaries():
         raise AlignmentException("UNIX sort utility is not available")
 
 
-def make_alignment(reference_file, reads_file, num_proc,
-                   platform, read_type, out_alignment):
+def make_alignment(
+    reference_file, reads_file, num_proc, platform, read_type, out_alignment
+):
     mode = platform + "-" + read_type
     _run_minimap(reference_file, reads_file, num_proc, mode, out_alignment)
 
@@ -49,8 +50,7 @@ def get_contigs_info(contigs_file):
     contigs_fasta = fp.read_sequence_dict(contigs_file)
     for ctg_id, ctg_seq in iteritems(contigs_fasta):
         contig_type = ctg_id.split("_")[0]
-        contigs_info[ctg_id] = ContigInfo(ctg_id, len(ctg_seq),
-                                          contig_type)
+        contigs_info[ctg_id] = ContigInfo(ctg_id, len(ctg_seq), contig_type)
 
     return contigs_info
 
@@ -68,10 +68,15 @@ def shift_gaps(seq_trg, seq_qry):
             swap_left = gap_start - 1
             swap_right = i - 1
 
-            while (swap_left > 0 and swap_right >= gap_start and
-                   lst_qry[swap_left] == lst_trg[swap_right]):
-                lst_qry[swap_left], lst_qry[swap_right] = \
-                            lst_qry[swap_right], lst_qry[swap_left]
+            while (
+                swap_left > 0
+                and swap_right >= gap_start
+                and lst_qry[swap_left] == lst_trg[swap_right]
+            ):
+                lst_qry[swap_left], lst_qry[swap_right] = (
+                    lst_qry[swap_right],
+                    lst_qry[swap_left],
+                )
                 swap_left -= 1
                 swap_right -= 1
 
@@ -79,7 +84,7 @@ def shift_gaps(seq_trg, seq_qry):
             is_gap = True
             gap_start = i
 
-    return "".join(lst_qry[1 : -1])
+    return "".join(lst_qry[1:-1])
 
 
 def get_uniform_alignments(alignments):
@@ -97,13 +102,13 @@ def get_uniform_alignments(alignments):
 
     def is_reliable(aln):
         return not aln.is_secondary and aln.map_qv >= MIN_QV
-        #return not aln.is_secondary and not aln.is_supplementary and aln.map_qv >= MIN_QV
+        # return not aln.is_secondary and not aln.is_supplementary and aln.map_qv >= MIN_QV
 
     seq_len = alignments[0].trg_len
     ctg_id = alignments[0].trg_id
 
-    #split contig into windows, get median read coverage over all windows and
-    #determine the quality threshold cutoffs for each window
+    # split contig into windows, get median read coverage over all windows and
+    # determine the quality threshold cutoffs for each window
     wnd_primary_cov = [0 for _ in range(seq_len // WINDOW + 1)]
     wnd_all_cov = [0 for _ in range(seq_len // WINDOW + 1)]
 
@@ -137,24 +142,26 @@ def get_uniform_alignments(alignments):
     for aln in alignments:
         original_sequence += aln.trg_end - aln.trg_start
 
-        #always keep primary alignments, regardless of local coverage
+        # always keep primary alignments, regardless of local coverage
         if is_reliable(aln):
             primary_sequence += aln.trg_end - aln.trg_start
             primary_aln += 1
             selected_alignments.append(aln)
 
-        #if alignment is secondary, count how many windows it helps to improve
+        # if alignment is secondary, count how many windows it helps to improve
         else:
             wnd_good, wnd_bad = _aln_score(aln)
             sec_aln_scores[aln.qry_id] = (wnd_good, wnd_bad, aln)
 
-    #now, greedily add secondaty alignments, until they add useful coverage
-    _score_fun = lambda x: (sec_aln_scores[x][0] - 2 * sec_aln_scores[x][1],
-                            sec_aln_scores[x][2].trg_end - sec_aln_scores[x][2].trg_start)
+    # now, greedily add secondaty alignments, until they add useful coverage
+    _score_fun = lambda x: (
+        sec_aln_scores[x][0] - 2 * sec_aln_scores[x][1],
+        sec_aln_scores[x][2].trg_end - sec_aln_scores[x][2].trg_start,
+    )
     sorted_sec_aln = [x for x in sorted(sec_aln_scores, reverse=True, key=_score_fun)]
     for aln_id in sorted_sec_aln:
         aln = sec_aln_scores[aln_id][2]
-        #recompute scores
+        # recompute scores
         wnd_good, wnd_bad = _aln_score(aln)
         to_take = wnd_good / (wnd_good + wnd_bad) > GOOD_RATE
         if to_take:
@@ -164,9 +171,9 @@ def get_uniform_alignments(alignments):
             for i in range(aln.trg_start // WINDOW, aln.trg_end // WINDOW + 1):
                 wnd_primary_cov[i] += 1
 
-        #logger.debug("\tSec score: {} {} {} {}".format(aln_id, wnd_good, wnd_bad, to_take))
+        # logger.debug("\tSec score: {} {} {} {}".format(aln_id, wnd_good, wnd_bad, to_take))
 
-    #logger.debug("Seq: {0} pri_cov: {1} all_cov: {2}".format(ctg_id, get_median(orig_primary_cov),
+    # logger.debug("Seq: {0} pri_cov: {1} all_cov: {2}".format(ctg_id, get_median(orig_primary_cov),
     #                                                         get_median(wnd_all_cov)) + "\n" +
     #            "\tOriginal seq: {0}, reads: {1}".format(original_sequence, len(alignments)) + "\n" +
     #            "\tPrimary seq: {0}, reads: {1}".format(primary_sequence, primary_aln) + "\n" +
@@ -174,7 +181,7 @@ def get_uniform_alignments(alignments):
     #            "\tSelected size: {0}, median coverage: {1}".format(len(selected_alignments), get_median(wnd_primary_cov)))
 
     median_cov = get_median(wnd_primary_cov)
-    #mean_cov = sum(wnd_primary_cov) / (len(wnd_primary_cov) + 1)
+    # mean_cov = sum(wnd_primary_cov) / (len(wnd_primary_cov) + 1)
 
     return selected_alignments, median_cov
 
@@ -182,7 +189,7 @@ def get_uniform_alignments(alignments):
 def split_into_chunks(fasta_in, chunk_size, fasta_out):
     out_dict = {}
     for header, seq in fp.stream_sequence(fasta_in):
-        #print len(seq)
+        # print len(seq)
         for i in range(0, max(len(seq) // chunk_size, 1)):
             chunk_hdr = "{0}$chunk_{1}".format(header, i)
             start = i * chunk_size
@@ -190,8 +197,8 @@ def split_into_chunks(fasta_in, chunk_size, fasta_out):
             if len(seq) - end < chunk_size:
                 end = len(seq)
 
-            #print(start, end)
-            out_dict[chunk_hdr] = seq[start : end]
+            # print(start, end)
+            out_dict[chunk_hdr] = seq[start:end]
 
     fp.write_fasta_dict(out_dict, fasta_out)
 
@@ -202,6 +209,7 @@ def merge_chunks(fasta_in, fold_function=lambda l: "".join(l)):
     Each chunk is as dictionary entry. Value type is arbitrary and
     one can supply a custom fold function
     """
+
     def name_split(h):
         orig_hdr, chunk_id = h.rsplit("$", 1)
         return orig_hdr, int(chunk_id.rsplit("_", 1)[1])
@@ -225,7 +233,7 @@ def merge_chunks(fasta_in, fold_function=lambda l: "".join(l)):
 
 
 def _run_minimap(reference_file, reads_files, num_proc, reads_type, out_file):
-    #SAM_HEADER = "\'@PG|@HD|@SQ|@RG|@CO\'"
+    # SAM_HEADER = "\'@PG|@HD|@SQ|@RG|@CO\'"
     work_dir = os.path.dirname(out_file)
     stderr_file = os.path.join(work_dir, "minimap.stderr")
     SORT_THREADS = "4"
@@ -249,36 +257,77 @@ def _run_minimap(reference_file, reads_files, num_proc, reads_type, out_file):
     cmdline.extend(["-x", mode, "-t", str(num_proc)])
     cmdline.extend(extra_args)
 
-    #Produces gzipped SAM sorted by reference name. Since it's not sorted by
-    #read name anymore, it's important that all reads have SEQ.
-    #is sam_output not set, produces PAF alignment
-    #a = SAM output, p = min primary-to-seconday score
-    #N = max secondary alignments
-    #--sam-hit-only = don't output unmapped reads
-    #--secondary-seq = custom option to output SEQ for seqcondary alignment with hard clipping
-    #-L: move CIGAR strings for ultra-long reads to the separate tag
-    #-Q don't output fastq quality
-    tmp_prefix = os.path.join(os.path.dirname(out_file),
-                              "sort_" + datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-    cmdline.extend(["-a", "-p", "0.5", "-N", "10", "--sam-hit-only", "-L", "-K", BATCH,
-                    "-z", "1000", "-Q", "--secondary-seq", "-I", "64G"])
-    cmdline.extend(["|", SAMTOOLS_BIN, "view", "-T", "'" + reference_file + "'", "-u", "-"])
-    cmdline.extend(["|", SAMTOOLS_BIN, "sort", "-T", "'" + tmp_prefix + "'", "-O", "bam",
-                    "-@", SORT_THREADS, "-l", "1", "-m", SORT_MEM])
+    # Produces gzipped SAM sorted by reference name. Since it's not sorted by
+    # read name anymore, it's important that all reads have SEQ.
+    # is sam_output not set, produces PAF alignment
+    # a = SAM output, p = min primary-to-seconday score
+    # N = max secondary alignments
+    # --sam-hit-only = don't output unmapped reads
+    # --secondary-seq = custom option to output SEQ for seqcondary alignment with hard clipping
+    # -L: move CIGAR strings for ultra-long reads to the separate tag
+    # -Q don't output fastq quality
+    tmp_prefix = os.path.join(
+        os.path.dirname(out_file),
+        "sort_" + datetime.datetime.now().strftime("%y%m%d_%H%M%S"),
+    )
+    cmdline.extend(
+        [
+            "-a",
+            "-p",
+            "0.5",
+            "-N",
+            "10",
+            "--sam-hit-only",
+            "-L",
+            "-K",
+            BATCH,
+            "-z",
+            "1000",
+            "-Q",
+            "--secondary-seq",
+            "-I",
+            "64G",
+        ]
+    )
+    cmdline.extend(
+        ["|", SAMTOOLS_BIN, "view", "-T", "'" + reference_file + "'", "-u", "-"]
+    )
+    cmdline.extend(
+        [
+            "|",
+            SAMTOOLS_BIN,
+            "sort",
+            "-T",
+            "'" + tmp_prefix + "'",
+            "-O",
+            "bam",
+            "-@",
+            SORT_THREADS,
+            "-l",
+            "1",
+            "-m",
+            SORT_MEM,
+        ]
+    )
     cmdline.extend(["-o", "'" + out_file + "'"])
 
-    #logger.debug("Running: " + " ".join(cmdline))
+    # logger.debug("Running: " + " ".join(cmdline))
     try:
         devnull = open(os.devnull, "wb")
-        subprocess.check_call(["/bin/bash", "-c",
-                              "set -eo pipefail; " + " ".join(cmdline)],
-                              stderr=open(stderr_file, "w"),
-                              stdout=open(os.devnull, "w"))
-        subprocess.check_call(SAMTOOLS_BIN + " index -@ 4 " + "'" + out_file + "'", shell=True)
-        #os.remove(stderr_file)
+        subprocess.check_call(
+            ["/bin/bash", "-c", "set -eo pipefail; " + " ".join(cmdline)],
+            stderr=open(stderr_file, "w"),
+            stdout=open(os.devnull, "w"),
+        )
+        subprocess.check_call(
+            SAMTOOLS_BIN + " index -@ 4 " + "'" + out_file + "'", shell=True
+        )
+        # os.remove(stderr_file)
 
     except (subprocess.CalledProcessError, OSError) as e:
-        logger.error("Error running minimap2, terminating. See the alignment error log "
-                     " for details: " + stderr_file)
+        logger.error(
+            "Error running minimap2, terminating. See the alignment error log "
+            " for details: " + stderr_file
+        )
         logger.error("Cmd: " + " ".join(cmdline))
         raise AlignmentException(str(e))

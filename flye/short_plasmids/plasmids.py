@@ -1,6 +1,6 @@
-#(c) 2016-2018 by Authors
-#This file is a part of Flye program.
-#Released under the BSD license (see LICENSE file)
+# (c) 2016-2018 by Authors
+# This file is a part of Flye program.
+# Released under the BSD license (see LICENSE file)
 
 from __future__ import absolute_import
 import os
@@ -20,20 +20,34 @@ logger = logging.getLogger()
 def assemble_short_plasmids(args, work_dir, contigs_path):
     logger.debug("Extracting unmapped reads")
     reads2contigs_mapping = os.path.join(work_dir, "reads2contigs.paf")
-    make_alignment(contigs_path, args.reads, args.threads,
-                   work_dir, args.platform, reads2contigs_mapping,
-                   reference_mode=True, sam_output=False)
+    make_alignment(
+        contigs_path,
+        args.reads,
+        args.threads,
+        work_dir,
+        args.platform,
+        reads2contigs_mapping,
+        reference_mode=True,
+        sam_output=False,
+    )
 
     unmapped_reads_path = os.path.join(work_dir, "unmapped_reads.fasta")
-    unmapped.extract_unmapped_reads(args, reads2contigs_mapping,
-                                    unmapped_reads_path,
-                                    mapping_rate_threshold=0.5)
+    unmapped.extract_unmapped_reads(
+        args, reads2contigs_mapping, unmapped_reads_path, mapping_rate_threshold=0.5
+    )
 
     logger.debug("Finding self-mappings for unmapped reads")
     unmapped_reads_mapping = os.path.join(work_dir, "unmapped_ava.paf")
-    make_alignment(unmapped_reads_path, [unmapped_reads_path], args.threads,
-                   work_dir, args.platform, unmapped_reads_mapping,
-                   reference_mode=False, sam_output=False)
+    make_alignment(
+        unmapped_reads_path,
+        [unmapped_reads_path],
+        args.threads,
+        work_dir,
+        args.platform,
+        unmapped_reads_mapping,
+        reference_mode=False,
+        sam_output=False,
+    )
 
     logger.debug("Extracting circular reads")
     circular_reads = circular.extract_circular_reads(unmapped_reads_mapping)
@@ -43,7 +57,7 @@ def assemble_short_plasmids(args, work_dir, contigs_path):
     circular_pairs = circular.extract_circular_pairs(unmapped_reads_mapping)
     logger.debug("Extracted %d circular pairs", len(circular_pairs))
 
-    #extracting only the necesssary subset of reads (the entire file could be pretty big)
+    # extracting only the necesssary subset of reads (the entire file could be pretty big)
     interesting_reads = {}
     for read in circular_reads:
         interesting_reads[read] = None
@@ -54,37 +68,57 @@ def assemble_short_plasmids(args, work_dir, contigs_path):
         if hdr in interesting_reads:
             interesting_reads[hdr] = seq
 
-    trimmed_circular_reads = \
-        circular.trim_circular_reads(circular_reads, interesting_reads)
-    trimmed_circular_pairs = \
-        circular.trim_circular_pairs(circular_pairs, interesting_reads)
+    trimmed_circular_reads = circular.trim_circular_reads(
+        circular_reads, interesting_reads
+    )
+    trimmed_circular_pairs = circular.trim_circular_pairs(
+        circular_pairs, interesting_reads
+    )
     trimmed_sequences_path = os.path.join(work_dir, "trimmed_sequences.fasta")
-    fp.write_fasta_dict(dict(list(trimmed_circular_reads.items()) +
-                             list(trimmed_circular_pairs.items())),
-                        trimmed_sequences_path)
+    fp.write_fasta_dict(
+        dict(
+            list(trimmed_circular_reads.items()) + list(trimmed_circular_pairs.items())
+        ),
+        trimmed_sequences_path,
+    )
 
     logger.debug("Clustering circular sequences")
     trimmed_sequences_mapping = os.path.join(work_dir, "trimmed.paf")
-    make_alignment(trimmed_sequences_path, [trimmed_sequences_path], args.threads,
-                   work_dir, args.platform, trimmed_sequences_mapping,
-                   reference_mode=False, sam_output=False)
+    make_alignment(
+        trimmed_sequences_path,
+        [trimmed_sequences_path],
+        args.threads,
+        work_dir,
+        args.platform,
+        trimmed_sequences_mapping,
+        reference_mode=False,
+        sam_output=False,
+    )
 
-    plasmids = \
-        circular.extract_unique_plasmids(trimmed_sequences_mapping,
-                                         trimmed_sequences_path)
+    plasmids = circular.extract_unique_plasmids(
+        trimmed_sequences_mapping, trimmed_sequences_path
+    )
 
     plasmids_raw = os.path.join(work_dir, "plasmids_raw.fasta")
     fp.write_fasta_dict(plasmids, plasmids_raw)
-    _, polished_stats = \
-        pol.polish(plasmids_raw, [unmapped_reads_path], work_dir, 1,
-                   args.threads, args.platform, args.read_type, output_progress=False)
+    _, polished_stats = pol.polish(
+        plasmids_raw,
+        [unmapped_reads_path],
+        work_dir,
+        1,
+        args.threads,
+        args.platform,
+        args.read_type,
+        output_progress=False,
+    )
 
-    #extract coverage
+    # extract coverage
     plasmids_with_coverage = {}
     if os.path.isfile(polished_stats):
         with open(polished_stats, "r") as f:
             for line in f:
-                if line.startswith("#"): continue
+                if line.startswith("#"):
+                    continue
                 tokens = line.strip().split()
                 seq_id, coverage = tokens[0], int(tokens[2])
                 if coverage > 0:
@@ -122,5 +156,6 @@ def update_graph(repeat_graph, plasmids_dict):
         edge_rev.mean_coverage = coverage
         repeat_graph.add_edge(edge_rev)
 
-        logger.debug("Added edge %d, length %d, coverage %d",
-                     new_edge_id, len(plasmid), coverage)
+        logger.debug(
+            "Added edge %d, length %d, coverage %d", new_edge_id, len(plasmid), coverage
+        )

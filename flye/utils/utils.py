@@ -1,6 +1,6 @@
-#(c) 2013-2016 by Authors
-#This file is a part of ABruijn program.
-#Released under the BSD license (see LICENSE file)
+# (c) 2013-2016 by Authors
+# This file is a part of ABruijn program.
+# Released under the BSD license (see LICENSE file)
 
 from __future__ import absolute_import
 import os
@@ -12,6 +12,7 @@ def which(program):
     """
     Mimics UNIX "which" command
     """
+
     def is_exe(fpath):
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
@@ -33,7 +34,7 @@ def process_in_parallel(function, arguments, num_proc):
     """
     Run given function in parallel using multithreading
     """
-    #making sure the main process catches SIGINT
+    # making sure the main process catches SIGINT
     threads = []
     orig_sigint = signal.signal(signal.SIGINT, signal.SIG_IGN)
     for _ in range(num_proc):
@@ -48,8 +49,9 @@ def process_in_parallel(function, arguments, num_proc):
             if t.exitcode == -9:
                 logger.error("Looks like the system ran out of memory")
             if t.exitcode != 0:
-                raise Exception("One of the processes exited with code: {0}"
-                                .format(t.exitcode))
+                raise Exception(
+                    "One of the processes exited with code: {0}".format(t.exitcode)
+                )
     except KeyboardInterrupt:
         for t in threads:
             t.terminate()
