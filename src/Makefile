@@ -5,6 +5,7 @@ CXXFLAGS += -Wno-missing-field-initializers
 LDFLAGS += -pthread -std=c++11 -rdynamic
 
 MODULES_BIN := ${BIN_DIR}/flye-modules
+BUILD_DIR := build
 
 profile: CXXFLAGS += -pg
 profile: LDFLAGS += -pg
@@ -20,54 +21,50 @@ debug: CXXFLAGS += -Og ${SANITIZE_FLAGS}
 debug: LDFLAGS += ${SANITIZE_FLAGS}
 debug: flye-modules
 
+# Ensure build directory exists
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
 
-#sequence module
-sequence_obj := ${patsubst %.cpp,%.o,${wildcard sequence/*.cpp}}
+# sequence module
+sequence_obj := ${patsubst sequence/%.cpp,${BUILD_DIR}/sequence_%.o,${wildcard sequence/*.cpp}}
 
-sequence/%.o: sequence/%.cpp sequence/*.h common/*.h
+${BUILD_DIR}/sequence_%.o: sequence/%.cpp sequence/*.h common/*.h | $(BUILD_DIR)
 	${CXX} -c ${CXXFLAGS} $< -o $@
 
-#flye-assemble module
-assemble_obj := ${patsubst %.cpp,%.o,${wildcard assemble/*.cpp}}
+# flye-assemble module
+assemble_obj := ${patsubst assemble/%.cpp,${BUILD_DIR}/assemble_%.o,${wildcard assemble/*.cpp}}
 
-assemble/%.o: assemble/%.cpp assemble/*.h sequence/*.h common/*.h
+${BUILD_DIR}/assemble_%.o: assemble/%.cpp assemble/*.h sequence/*.h common/*.h | $(BUILD_DIR)
 	${CXX} -c ${CXXFLAGS} $< -o $@
 
-#flye-repeat module
-repeat_obj := ${patsubst %.cpp,%.o,${wildcard repeat_graph/*.cpp}}
+# flye-repeat module
+repeat_obj := ${patsubst repeat_graph/%.cpp,${BUILD_DIR}/repeat_%.o,${wildcard repeat_graph/*.cpp}}
 
-repeat_graph/%.o: repeat_graph/%.cpp repeat_graph/*.h sequence/*.h common/*.h
+${BUILD_DIR}/repeat_%.o: repeat_graph/%.cpp repeat_graph/*.h sequence/*.h common/*.h | $(BUILD_DIR)
 	${CXX} -c ${CXXFLAGS} $< -o $@
 
-#flye-contigger module
-contigger_obj := ${patsubst %.cpp,%.o,${wildcard contigger/*.cpp}}
+# flye-contigger module
+contigger_obj := ${patsubst contigger/%.cpp,${BUILD_DIR}/contigger_%.o,${wildcard contigger/*.cpp}}
 
-contigger/%.o: contigger/%.cpp repeat_graph/*.h sequence/*.h common/*.h
+${BUILD_DIR}/contigger_%.o: contigger/%.cpp repeat_graph/*.h sequence/*.h common/*.h | $(BUILD_DIR)
 	${CXX} -c ${CXXFLAGS} $< -o $@
 
+# flye-polish module
+polish_obj := ${patsubst polishing/%.cpp,${BUILD_DIR}/polish_%.o,${wildcard polishing/*.cpp}}
 
-#flye-polish module
-polish_obj := ${patsubst %.cpp,%.o,${wildcard polishing/*.cpp}}
-
-polishing/%.o: polishing/%.cpp bin/polisher.cpp polishing/*.h common/*h
+${BUILD_DIR}/polish_%.o: polishing/%.cpp polishing/*.h common/*.h | $(BUILD_DIR)
 	${CXX} -c ${CXXFLAGS} $< -o $@
 
-#main module
-#main_obj := ${patsubst %.cpp,%.o,${wildcard main/*.cpp}}
-main_obj := main.o
+# main module
+main_obj := ${BUILD_DIR}/main.o
+
+${BUILD_DIR}/main.o: main.cpp | $(BUILD_DIR)
+	${CXX} -c ${CXXFLAGS} $< -o $@
+
 flye-modules: ${assemble_obj} ${sequence_obj} ${repeat_obj} ${contigger_obj} ${polish_obj} ${main_obj}
 	${CXX} ${assemble_obj} ${sequence_obj} ${repeat_obj} ${contigger_obj} ${polish_obj} ${main_obj} -o ${MODULES_BIN} ${LDFLAGS}
 
-#main/%.o: main/%.cpp assemble/*.h sequence/*.h common/*.h repeat_graph/*.h contigger/*.h polishing/*.h
-main.o: main.cpp
-	${CXX} -c ${CXXFLAGS} $< -o $@
-
-
 clean:
-	rm -f ${repeat_obj}
-	rm -f ${sequence_obj}
-	rm -f ${assemble_obj}
-	rm -f ${polish_obj}
-	rm -f ${contigger_obj}
-	rm -f ${main_obj}
+	rm -rf ${BUILD_DIR}
 	rm -f ${MODULES_BIN}
+
