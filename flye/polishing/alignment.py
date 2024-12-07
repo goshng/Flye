@@ -314,6 +314,7 @@ def _run_minimap(reference_file, reads_files, num_proc, reads_type, out_file):
     # logger.debug("Running: " + " ".join(cmdline))
     try:
         devnull = open(os.devnull, "wb")
+        logger.debug("Running: " + " ".join(cmdline))
         subprocess.check_call(
             ["/bin/bash", "-c", "set -eo pipefail; " + " ".join(cmdline)],
             stderr=open(stderr_file, "w"),

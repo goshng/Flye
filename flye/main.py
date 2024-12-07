@@ -546,7 +546,7 @@ def _run(args):
     """
     Runs the pipeline
     """
-    logger.info("Starting Flye " + _version())
+    logger.info("Starting dFlye " + _version())
     logger.debug("Cmd: %s", " ".join(sys.argv))
     logger.debug("Python version: " + sys.version)
 
