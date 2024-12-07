@@ -35,6 +35,22 @@ void ContigExtender::generateUnbranchingPaths() {
   _edgeToPath.clear();
   for (auto &path : _unbranchingPaths) {
     path.prefix = "edge_";
+
+    // dflye: Log paths only when directional reads are enabled and forward
+    // strand
+    if (_directionalReads) {
+      bool allForward = true;
+      for (auto &edge : path.path) {
+        if (!edge->isForwardStrand()) {
+          allForward = false;
+          break;
+        }
+      }
+      if (!allForward) {
+        continue; // Skip paths with reverse-strand edges
+      }
+    }
+
     if (path.id.strand()) {
       Logger::get().debug()
           << "UPath " << path.id.signedId() << ": " << path.edgesStr();
@@ -65,6 +81,13 @@ void ContigExtender::generateContigs() {
   for (auto &aln : _aligner.getAlignments()) {
     if (aln.size() > 1) {
       for (auto edge : aln) {
+
+        // dflye: Skip reverse-strand alignments if directional reads are
+        // enabled
+        if (_directionalReads && !edge.overlap.isForwardStrand()) {
+          continue;
+        }
+
         alnIndex[edge.edge].push_back(&aln);
       }
     }
@@ -242,6 +265,13 @@ std::vector<UnbranchingPath *> ContigExtender::asUpaths(const GraphPath &path) {
   std::vector<UnbranchingPath *> upathRepr;
   for (size_t i = 0; i < path.size(); ++i) {
     UnbranchingPath *upath = _edgeToPath.at(path[i]);
+
+    // dflye: Skip reverse-strand paths if directional reads are enabled
+    if (_directionalReads && !upath->id.strand()) {
+      continue;
+    }
+    // dflye: End of directional read filtering
+
     if (upathRepr.empty() || upathRepr.back() != upath ||
         path[i - 1] == path[i]) {
       upathRepr.push_back(upath);
@@ -256,6 +286,13 @@ ContigExtender::asUpathAlignment(const GraphAlignment &graphAln) {
   std::vector<ContigExtender::UpathAlignment> upathAln;
   for (size_t i = 0; i < graphAln.size(); ++i) {
     UnbranchingPath *upath = _edgeToPath.at(graphAln[i].edge);
+
+    // dflye: Skip reverse-strand paths if directional reads are enabled
+    if (_directionalReads && !upath->id.strand()) {
+      continue;
+    }
+    // dflye: End of directional read filtering
+
     if (upathAln.empty() || upathAln.back().upath != upath ||
         graphAln[i - 1].edge == graphAln[i].edge) {
       upathAln.emplace_back();
@@ -275,6 +312,13 @@ void ContigExtender::appendGfaPaths(const std::string &filename) {
   for (auto &ctg : _contigs) {
     std::string pathStr;
     for (auto &upath : ctg.graphPaths) {
+
+      // dflye: Skip reverse-strand paths if directional reads are enabled
+      if (_directionalReads && !upath->id.strand()) {
+        continue;
+      }
+      // dflye: End of directional read filtering
+
       int edgeId = upath->id.signedId();
       char sign = "-+"[edgeId > 0];
       pathStr += upath->nameUnsigned() + sign + ",";
@@ -307,9 +351,23 @@ void ContigExtender::outputStatsTable(const std::string &filename) {
 
   for (auto &ctg : _contigs) {
     std::string pathStr;
+
     for (auto &upath : ctg.graphPaths) {
+
+      // dflye: Skip reverse-strand paths if directional reads are enabled
+      if (_directionalReads && !upath->id.strand()) {
+        continue;
+      }
+      // dflye: End of directional read filtering
+
       pathStr += std::to_string(upath->id.signedId()) + ",";
     }
+
+    if (pathStr.empty()) {
+      continue; // dflye: Skip contigs with no valid paths when directional
+                // reads are enabled
+    }
+
     pathStr.pop_back();
 
     int estMult = std::max(
@@ -350,6 +408,23 @@ void ContigExtender::outputStatsTable(const std::string &filename) {
 void ContigExtender::outputContigs(const std::string &filename) {
   std::vector<FastaRecord> contigsFasta;
   for (auto &ctg : _contigs) {
+
+    // dflye: Skip contigs with reverse-strand paths if directional reads are
+    // enabled
+    if (_directionalReads) {
+      bool hasForwardStrand = false;
+      for (auto &upath : ctg.graphPaths) {
+        if (upath->id.strand()) {
+          hasForwardStrand = true;
+          break;
+        }
+      }
+      if (!hasForwardStrand) {
+        continue; // Skip this contig entirely if it has no forward-strand paths
+      }
+    }
+    // dflye: End of directional read filtering
+
     contigsFasta.emplace_back(ctg.sequence, ctg.graphEdges.name(),
                               FastaRecord::ID_NONE);
   }
@@ -378,6 +453,13 @@ void ContigExtender::outputScaffoldConnections(const std::string &filename) {
       visited.insert(curEdge);
       visited.insert(_graph.complementEdge(curEdge));
       for (auto &adjEdge : curEdge->nodeRight->outEdges) {
+
+        // dflye: Skip reverse-strand edges if directional reads are enabled
+        if (_directionalReads && !adjEdge->edgeId.strand()) {
+          continue;
+        }
+        // dflye: End of directional read filtering
+
         if (adjEdge->isRepetitive() && !adjEdge->isLooped() &&
             !visited.count(adjEdge)) {
           dfsStack.push_back(adjEdge);
@@ -398,6 +480,12 @@ void ContigExtender::outputScaffoldConnections(const std::string &filename) {
     if (edge->repetitive)
       continue;
 
+    // dflye: Skip reverse-strand edges if directional reads are enabled
+    if (_directionalReads && !edge->edgeId.strand()) {
+      continue;
+    }
+    // dflye: End of directional read filtering
+
     auto reachableUnique = reachableEdges(edge);
     if (reachableUnique.size() != 1)
       continue;
@@ -411,6 +499,15 @@ void ContigExtender::outputScaffoldConnections(const std::string &filename) {
         abs(edge->edgeId.signedId()) < abs(outEdge->edgeId.signedId())) {
       UnbranchingPath leftCtg = *this->asUpaths({edge}).front();
       UnbranchingPath rightCtg = *this->asUpaths({outEdge}).front();
+
+      // dflye: Skip reverse-strand paths in scaffold connections if directional
+      // reads are enabled
+      if (_directionalReads &&
+          (!leftCtg.id.strand() || !rightCtg.id.strand())) {
+        continue;
+      }
+      // dflye: End of directional read filtering
+
       if (leftCtg.id != rightCtg.id) {
         leftCtg.prefix = "contig_";
         rightCtg.prefix = "contig_";

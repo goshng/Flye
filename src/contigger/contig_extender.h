@@ -12,9 +12,10 @@ class ContigExtender {
 public:
   ContigExtender(RepeatGraph &graph, const ReadAligner &aligner,
                  const SequenceContainer &asmSeqs,
-                 const SequenceContainer &readSeqs)
+                 const SequenceContainer &readSeqs,
+                 bool directionalReads = false)
       : _graph(graph), _aligner(aligner), _asmSeqs(asmSeqs),
-        _readSeqs(readSeqs) {}
+        _readSeqs(readSeqs), _directionalReads(directionalReads) {}
 
   void generateUnbranchingPaths();
   void generateContigs();
@@ -58,4 +59,6 @@ private:
   const ReadAligner &_aligner;
   const SequenceContainer &_asmSeqs;
   const SequenceContainer &_readSeqs;
+
+  bool _directionalReads; // Tracks whether directional reads are enabled
 };

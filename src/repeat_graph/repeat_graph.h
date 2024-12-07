@@ -113,6 +113,8 @@ struct GraphEdge {
 
   std::string edgeDescr() const { return std::to_string(edgeId.signedId()); }
 
+  bool isForwardStrand() const { return edgeId.strand(); }
+
   std::unordered_set<GraphEdge *> adjacentEdges();
 
   /////////////////////////

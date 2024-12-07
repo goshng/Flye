@@ -5,12 +5,14 @@
 flye_root=/home/goshng/all/polap/Flye
 out_dir=${flye_root}/o-d
 
-mkdir -p ${out_dir}/20-repeat
-bin/flye-modules repeat \
-	--disjointigs ${out_dir}/10-consensus/consensus.fasta \
+mkdir -p ${out_dir}/30-contigger
+bin/flye-modules contigger \
+	--graph-edges ${out_dir}/20-repeat/repeat_graph_edges.fasta \
 	--reads ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz \
-	--out-dir ${out_dir}/20-repeat \
+	--out-dir ${out_dir}/30-contigger \
 	--config ${flye_root}/flye/config/bin_cfg/asm_corrected_reads.cfg \
+	--repeat-graph ${out_dir}/20-repeat/repeat_graph_dump \
+	--graph-aln ${out_dir}/20-repeat/read_alignment_dump \
 	--log ${out_dir}/flye.log \
 	--threads 8 \
 	--debug \
