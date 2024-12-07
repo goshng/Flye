@@ -5,6 +5,19 @@
 flye_root=/home/goshng/all/polap/Flye
 out_dir=${flye_root}/o-d
 
+mkdir -p ${out_dir}/20-repeat
+bin/flye-modules repeat \
+	--disjointigs ${out_dir}/10-consensus/consensus.fasta \
+	--reads ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz \
+	--out-dir ${out_dir}/20-repeat \
+	--config ${flye_root}/flye/config/bin_cfg/asm_corrected_reads.cfg \
+	--log ${out_dir}/flye.log \
+	--threads 8 \
+	--debug \
+	--min-ovlp 1000 \
+	--directional-reads
+exit
+
 # All
 rm -rf ${out_dir}
 bin/flye \
@@ -81,12 +94,17 @@ bin/flye-modules assemble \
 
 exit
 
+# All
 rm -rf ${out_dir}
 bin/flye \
-	--pacbio-corr $reads_file \
-	--debug -g 500k -o $out_dir -t 8 -m 1000
+	--pacbio-corr ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz \
+	--stop-after consensus \
+	--directional-reads \
+	--debug \
+	-g 500k -o $out_dir -t 8 -m 1000
 exit
 
+# folder preparation
 flye_root=/home/goshng/all/polap/Flye
 out_dir=${flye_root}/od
 mkdir -p \
@@ -147,7 +165,8 @@ bin/flye-modules repeat \
 	--log ${out_dir}/flye.log \
 	--threads 8 \
 	--debug \
-	--min-ovlp 1000
+	--min-ovlp 1000 \
+	--directional-reads
 
 # Stage: contigger
 # input1: ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
@@ -167,7 +186,8 @@ bin/flye-modules contigger \
 	--log ${out_dir}/flye.log \
 	--threads 8 \
 	--debug \
-	--min-ovlp 1000
+	--min-ovlp 1000 \
+	--directional-reads
 
 # Stage: polishing 1
 # input1: ${out_dir}/30-contigger/contigs.fasta

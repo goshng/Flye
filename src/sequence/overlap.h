@@ -202,6 +202,11 @@ struct OverlapRange {
     return std::min(extEnd, other.extEnd) - std::max(extBegin, other.extBegin);
   }
 
+    // dflye: Method to determine if the overlap is on the forward strand
+    bool isForwardStrand() const {
+        return curStrand; // Assume curStrand reflects the forward strand direction
+    }
+
   // dflye: TODO: dump output process needs to be changed.
   void dump(std::ostream &os, const SequenceContainer &curContainer,
             const SequenceContainer &extContainer) {

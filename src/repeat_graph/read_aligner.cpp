@@ -37,6 +37,12 @@ std::vector<GraphAlignment> ReadAligner::chainReadAlignments(
     bool canBeExtended =
         edgeAlignment.overlap.extLen - edgeAlignment.overlap.extEnd < MAX_JUMP;
 
+    // dflye: Skip reverse strand alignments if directional reads are enabled
+    if (_directionalReads && !edgeAlignment.overlap.isForwardStrand()) {
+      continue;
+    }
+    // dflye: End of directional read filtering
+
     if (canExtend) {
       for (auto &chain : activeChains) {
         const OverlapRange &nextOvlp = edgeAlignment.overlap;
@@ -194,6 +200,12 @@ void ReadAligner::alignReads() {
         auto overlaps = readsOverlaps.quickSeqOverlaps(seqId);
         std::vector<EdgeAlignment> alignments;
         for (auto &ovlp : overlaps) {
+          // dflye: Skip reverse-strand overlaps if directional reads are
+          // enabled
+          if (_directionalReads && !ovlp.isForwardStrand()) {
+            continue;
+          }
+          // dflye: End of directional read filtering
           // because edges might be as short as max_separation,
           // we set minimum alignment threshold to a bit shorter value.
           // However, apply the actual threshold for longer edges now.
@@ -274,6 +286,13 @@ void ReadAligner::updateAlignments() {
 
       if (aln[i].edge->nodeRight != aln[i + 1].edge->nodeLeft)
         return false;
+
+      /* dflye: Ensure all edges in the alignment are forward strand if
+       * directional reads are enabled */
+      if (_directionalReads && (!aln[i].overlap.isForwardStrand() ||
+                                !aln[i + 1].overlap.isForwardStrand()))
+        return false;
+      /* dflye: End of directional read check */
     }
     return true;
   };
@@ -285,16 +304,34 @@ void ReadAligner::updateAlignments() {
       if (!_graph.getEdge(aln[i].edge->edgeId))
         continue;
 
+      /* dflye: Skip reverse strand edges if directional reads are enabled */
+      if (_directionalReads && !aln[i].overlap.isForwardStrand())
+        continue;
+      /* dflye: End of directional edge check */
+
       curAlignment.push_back(aln[i]);
+      /* if (!_graph.getEdge(aln[i + 1].edge->edgeId) || */
+      /*     aln[i].edge->nodeRight != aln[i + 1].edge->nodeLeft) { */
       if (!_graph.getEdge(aln[i + 1].edge->edgeId) ||
-          aln[i].edge->nodeRight != aln[i + 1].edge->nodeLeft) {
+          aln[i].edge->nodeRight != aln[i + 1].edge->nodeLeft ||
+          (_directionalReads &&
+           !aln[i + 1]
+                .overlap.isForwardStrand())) { // dflye: Additional strand check
         newlyAdded.push_back(curAlignment);
         curAlignment.clear();
       }
     }
 
-    if (_graph.getEdge(aln.back().edge->edgeId))
+    /* if (_graph.getEdge(aln.back().edge->edgeId)) */
+    /*   curAlignment.push_back(aln.back()); */
+
+    if (_graph.getEdge(aln.back().edge->edgeId) &&
+        (!_directionalReads ||
+         aln.back().overlap.isForwardStrand())) { // dflye: Ensure final edge
+                                                  // respects strand
       curAlignment.push_back(aln.back());
+    }
+
     if (!curAlignment.empty())
       newlyAdded.push_back(curAlignment);
   };
@@ -324,12 +361,21 @@ void ReadAligner::storeAlignments(const std::string &filename) {
     throw std::runtime_error("Can't open " + filename);
   }
 
+  // dflye: Include metadata for directional reads
+  fout << "DirectionalReads\t" << (_directionalReads ? "true" : "false")
+       << "\n";
+
   for (auto &chain : _readAlignments) {
     fout << "Chain\n";
     for (auto &aln : chain) {
       fout << "\tAln\t" << aln.edge->edgeId << "\t";
       aln.overlap.dump(fout, _readSeqs, _graph.edgeSequences());
       fout << "\n";
+      // dflye: Store strand information if directional reads are enabled
+      if (_directionalReads) {
+        fout << "\tStrand\t"
+             << (aln.overlap.isForwardStrand() ? "forward" : "reverse") << "\n";
+      }
     }
   }
 }
@@ -341,6 +387,8 @@ void ReadAligner::loadAlignments(const std::string &filename) {
   }
 
   GraphAlignment curAlignment;
+  bool metadataLoaded = false; // dflye: Flag to check if metadata is loaded
+
   while (true) {
     std::string buffer;
     fin >> buffer;
@@ -349,7 +397,16 @@ void ReadAligner::loadAlignments(const std::string &filename) {
     if (!fin.good())
       throw std::runtime_error("Error parsing: " + filename);
 
-    if (buffer == "Chain") {
+    // dflye:
+    if (buffer ==
+        "DirectionalReads") { // dflye: Load directional reads metadata
+      std::string value;
+      fin >> value;
+      _directionalReads = (value == "true");
+      metadataLoaded = true;
+      // dflye:
+    } else if (buffer == "Chain") {
+
       if (!curAlignment.empty()) {
         curAlignment.shrink_to_fit();
         _readAlignments.push_back(curAlignment);
@@ -367,6 +424,14 @@ void ReadAligner::loadAlignments(const std::string &filename) {
         // so, we check if the edge exists
         curAlignment.push_back({ovlp, edge});
       }
+    } else if (buffer ==
+               "Strand") { // dflye: Handle strand metadata for alignments
+      std::string strand;
+      fin >> strand;
+      if (_directionalReads && strand != "forward") {
+        curAlignment.clear(); // Skip reverse-strand alignment if directional
+                              // reads are enabled
+      }
     } else
       throw std::runtime_error("Error parsing: " + filename);
   }
@@ -374,6 +439,10 @@ void ReadAligner::loadAlignments(const std::string &filename) {
     curAlignment.shrink_to_fit();
     _readAlignments.push_back(curAlignment);
     curAlignment.clear();
+  }
+
+  if (!metadataLoaded) { // dflye: Default _directionalReads if not specified
+    _directionalReads = false;
   }
 
   this->updateAlignments();
@@ -385,6 +454,13 @@ ReadAligner::AlnIndex ReadAligner::makeAlignmentIndex() {
     if (aln.size() > 1) {
       std::unordered_set<GraphEdge *> uniqueEdges;
       for (auto &edgeAln : aln) {
+        // dflye: Skip reverse-strand alignments if directional reads are
+        // enabled
+        if (_directionalReads && !edgeAln.overlap.isForwardStrand()) {
+          continue;
+        }
+        // dflye: End of directional read check
+
         uniqueEdges.insert(edgeAln.edge);
       }
       for (GraphEdge *edge : uniqueEdges)
@@ -402,6 +478,13 @@ float ReadAligner::getChainBaseDivergence(const GraphAlignment &chain,
   float sumMatched = 0;
   int alnLen = 0;
   for (auto &aln : chain) {
+
+    // dflye: Skip reverse-strand overlaps if directional reads are enabled
+    if (_directionalReads && !aln.overlap.isForwardStrand()) {
+      continue;
+    }
+    // dflye: End of directional read filtering
+
     float ovlpDivergence = aln.overlap.seqDivergence;
     if (realign) {
       ovlpDivergence =
@@ -413,6 +496,10 @@ float ReadAligner::getChainBaseDivergence(const GraphAlignment &chain,
     sumMatched += aln.overlap.curRange() * (1 - ovlpDivergence);
     alnLen += aln.overlap.curRange();
   }
+
+  if (alnLen == 0) { // dflye: Handle cases where no valid alignments remain
+    return 1.0f;     // Maximum divergence
+  }
   float chainDivergence = 1 - (float)sumMatched / alnLen;
 
   return chainDivergence;
@@ -422,6 +509,14 @@ ReadAligner::ConnIndex ReadAligner::getEdgeConnectivity() const {
   ConnIndex connections;
   for (auto &aln : _readAlignments) {
     for (size_t i = 0; i < aln.size() - 1; ++i) {
+
+      // dflye: Skip reverse-strand alignments if directional reads are enabled
+      if (_directionalReads && (!aln[i].overlap.isForwardStrand() ||
+                                !aln[i + 1].overlap.isForwardStrand())) {
+        continue;
+      }
+      // dflye: End of directional read filtering
+
       ++connections[aln[i].edge][aln[i + 1].edge];
     }
   }

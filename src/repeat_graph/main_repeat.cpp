@@ -27,8 +27,8 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
                std::string &outFolder, std::string &logFile,
                std::string &inAssembly, int &kmerSize, int &minOverlap,
                bool &debug, size_t &numThreads, std::string &configPath,
-               bool &unevenCov, bool &keepHaplotypes,
-               std::string &extraParams) {
+               bool &unevenCov, bool &keepHaplotypes, std::string &extraParams,
+               bool &directionalReads) {
   auto printUsage = []() {
     std::cerr
         << "Usage: flye-repeat "
@@ -56,7 +56,9 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
         << "  --extra-params additional config parameters "
         << "[default = not set] \n"
         << "  --threads num_threads\tnumber of parallel threads "
-        << "[default = 1] \n";
+        << "[default = 1] \n"
+        << "  --directional-reads \t\tfilter overlaps by direction "
+        << "[default = false] \n";
   };
 
   int optionIndex = 0;
@@ -72,6 +74,7 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
                                  {"meta", no_argument, 0, 0},
                                  {"keep-haplotypes", no_argument, 0, 0},
                                  {"debug", no_argument, 0, 0},
+                                 {"directional-reads", no_argument, 0, 0},
                                  {0, 0, 0, 0}};
 
   int opt = 0;
@@ -89,6 +92,8 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
         logFile = optarg;
       else if (!strcmp(longOptions[optionIndex].name, "debug"))
         debug = true;
+      else if (!strcmp(longOptions[optionIndex].name, "directional-reads"))
+        directionalReads = true;
       else if (!strcmp(longOptions[optionIndex].name, "meta"))
         unevenCov = true;
       else if (!strcmp(longOptions[optionIndex].name, "keep-haplotypes"))
@@ -131,6 +136,7 @@ int repeat_main(int argc, char **argv) {
   int minOverlap = 5000;
   bool isMeta = false;
   bool keepHaplotypes = false;
+  bool directionalReads = false;
   std::string readsFasta;
   std::string inAssembly;
   std::string outFolder;
@@ -139,7 +145,7 @@ int repeat_main(int argc, char **argv) {
   std::string extraParams;
   if (!parseArgs(argc, argv, readsFasta, outFolder, logFile, inAssembly,
                  kmerSize, minOverlap, debugging, numThreads, configPath,
-                 isMeta, keepHaplotypes, extraParams))
+                 isMeta, keepHaplotypes, extraParams, directionalReads))
     return 1;
 
   Logger::get().setDebugging(debugging);
@@ -169,6 +175,8 @@ int repeat_main(int argc, char **argv) {
                         << Parameters::get().kmerSize;
   Logger::get().debug() << "Selected minimum overlap " << minOverlap;
   Logger::get().debug() << "Metagenome mode: " << "NY"[isMeta];
+  Logger::get().debug() << "Directional reads enabled for repeat stage: "
+                        << (directionalReads ? "Yes" : "No");
 
   Logger::get().info() << "Parsing disjointigs";
   SequenceContainer seqAssembly;
@@ -183,7 +191,9 @@ int repeat_main(int argc, char **argv) {
 
   Logger::get().info() << "Building repeat graph";
   SequenceContainer edgeSequences;
+  // dflye:
   RepeatGraph rg(seqAssembly, &edgeSequences);
+  // dflye:
   rg.build(keepHaplotypes);
   // rg.validateGraph();
 
@@ -203,7 +213,9 @@ int repeat_main(int argc, char **argv) {
   rg.updateEdgeSequences();
 
   Logger::get().info() << "Aligning reads to the graph";
-  ReadAligner aligner(rg, seqReads);
+  // dflye:
+  ReadAligner aligner(rg, seqReads, directionalReads);
+  // dflye:
   aligner.alignReads();
   MultiplicityInferer multInf(rg, aligner, seqAssembly);
   multInf.estimateCoverage();

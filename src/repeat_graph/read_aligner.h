@@ -18,8 +18,10 @@ typedef std::vector<EdgeAlignment> GraphAlignment;
 
 class ReadAligner {
 public:
-  ReadAligner(RepeatGraph &graph, const SequenceContainer &readSeqs)
-      : _graph(graph), _readSeqs(readSeqs) {}
+  ReadAligner(RepeatGraph &graph, const SequenceContainer &readSeqs,
+              bool directionalReads = false)
+      : _graph(graph), _readSeqs(readSeqs),
+        _directionalReads(directionalReads) {}
 
   void alignReads();
   void updateAlignments();
@@ -48,4 +50,7 @@ private:
   RepeatGraph &_graph;
   // const SequenceContainer&   _asmSeqs;
   const SequenceContainer &_readSeqs;
+
+  // dflye: Indicates if directional reads are enabled
+  bool _directionalReads;
 };

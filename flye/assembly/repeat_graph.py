@@ -61,6 +61,8 @@ def analyse_repeats(
         cmdline.append("--debug")
     if args.meta:
         cmdline.append("--meta")
+    if args.directional_reads:
+        cmdline.append("--directional-reads")
     if args.keep_haplotypes:
         cmdline.append("--keep-haplotypes")
     # if args.kmer_size:
@@ -117,6 +119,8 @@ def generate_contigs(
         cmdline.append("--debug")
     if args.keep_haplotypes:
         cmdline.append("--no-scaffold")
+    if args.directional_reads:
+        cmdline.append("--directional-reads")
     # if args.kmer_size:
     #    cmdline.extend(["--kmer", str(args.kmer_size)])
     cmdline.extend(["--min-ovlp", str(run_params["min_overlap"])])

@@ -27,7 +27,8 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
                std::string &inGraphEdges, int &kmerSize, int &minOverlap,
                bool &debug, size_t &numThreads, std::string &configPath,
                std::string &inRepeatGraph, std::string &inReadsAlignment,
-               bool &noScaffold, std::string &extraParams) {
+               bool &noScaffold, std::string &extraParams,
+               bool &directionalReads) {
   auto printUsage = []() {
     std::cerr
         << "Usage: flye-contigger "
@@ -55,7 +56,9 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
         << "  --extra-params additional config parameters "
         << "[default = not set] \n"
         << "  --threads num_threads\tnumber of parallel threads "
-        << "[default = 1] \n";
+        << "[default = 1] \n"
+        << "  --directional-reads \t\tfilter overlaps by direction "
+        << "[default = false] \n";
   };
 
   int optionIndex = 0;
@@ -72,6 +75,7 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
                                  {"extra-params", required_argument, 0, 0},
                                  {"debug", no_argument, 0, 0},
                                  {"no-scaffold", no_argument, 0, 0},
+                                 {"directional-reads", no_argument, 0, 0},
                                  {0, 0, 0, 0}};
 
   int opt = 0;
@@ -89,6 +93,8 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
         logFile = optarg;
       else if (!strcmp(longOptions[optionIndex].name, "debug"))
         debug = true;
+      else if (!strcmp(longOptions[optionIndex].name, "directional-reads"))
+        directionalReads = true;
       else if (!strcmp(longOptions[optionIndex].name, "no-scaffold"))
         noScaffold = true;
       else if (!strcmp(longOptions[optionIndex].name, "reads"))
@@ -132,6 +138,7 @@ int contigger_main(int argc, char **argv) {
   int kmerSize = -1;
   int minOverlap = 5000;
   bool noScaffold = false;
+  bool directionalReads = false;
   std::string readsFasta;
   std::string inGraphEdges;
   std::string inRepeatGraph;
@@ -142,7 +149,8 @@ int contigger_main(int argc, char **argv) {
   std::string extraParams;
   if (!parseArgs(argc, argv, readsFasta, outFolder, logFile, inGraphEdges,
                  kmerSize, minOverlap, debugging, numThreads, configPath,
-                 inRepeatGraph, inReadsAlignment, noScaffold, extraParams))
+                 inRepeatGraph, inReadsAlignment, noScaffold, extraParams,
+                 directionalReads))
     return 1;
 
   Logger::get().setDebugging(debugging);
@@ -170,6 +178,8 @@ int contigger_main(int argc, char **argv) {
   Logger::get().debug() << "Running with k-mer size: "
                         << Parameters::get().kmerSize;
   Logger::get().debug() << "Selected minimum overlap " << minOverlap;
+  Logger::get().debug() << "Directional reads enabled for contig stage: "
+                        << (directionalReads ? "Yes" : "No");
 
   Logger::get().info() << "Reading sequences";
   SequenceContainer seqGraphEdges;
@@ -191,7 +201,7 @@ int contigger_main(int argc, char **argv) {
   RepeatGraph rg(emptyContainer, &seqGraphEdges);
   rg.loadGraph(inRepeatGraph);
   // rg.validateGraph();
-  ReadAligner aln(rg, seqReads);
+  ReadAligner aln(rg, seqReads, directionalReads);
   aln.loadAlignments(inReadsAlignment);
   OutputGenerator outGen(rg, aln);
 

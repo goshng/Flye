@@ -1,5 +1,8 @@
 o
 o-d
+trash
+*.fastq
+*.fasta
 l
 l-d
 l.fq
