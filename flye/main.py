@@ -332,6 +332,8 @@ class JobConsensus(Job):
             out_alignment,
         )
 
+        # dflye: convert the minimap.bam for dFlye?
+
         contigs_info = aln.get_contigs_info(self.in_contigs)
         logger.info("Computing consensus")
         consensus_fasta = cons.get_consensus(

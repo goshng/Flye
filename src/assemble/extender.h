@@ -14,10 +14,12 @@
 class Extender {
 public:
   Extender(const SequenceContainer &readsContainer,
-           OverlapContainer &ovlpContainer, int safeOverlap)
+           OverlapContainer &ovlpContainer, int safeOverlap,
+           bool directionalReads = false)
       : _safeOverlap(safeOverlap), _readsContainer(readsContainer),
         _ovlpContainer(ovlpContainer),
-        _chimDetector(readsContainer, ovlpContainer) {}
+        _chimDetector(readsContainer, ovlpContainer),
+        _directionalReads(directionalReads) {}
 
   void assembleDisjointigs();
   const std::vector<ContigPath> &getDisjointigPaths() const {
@@ -63,6 +65,7 @@ private:
   const SequenceContainer &_readsContainer;
   OverlapContainer &_ovlpContainer;
   ChimeraDetector _chimDetector;
+  bool _directionalReads; // Flag for enforcing directional reads
 
   std::vector<ExtensionInfo> _readLists;
   std::vector<ContigPath> _disjointigPaths;

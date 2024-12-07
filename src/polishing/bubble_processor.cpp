@@ -20,10 +20,10 @@ size_t fileSize(const std::string &filename) {
 BubbleProcessor::BubbleProcessor(const std::string &subsMatPath,
                                  const std::string &hopoMatrixPath,
                                  bool showProgress, bool hopoEnabled)
-    : _hopoEnabled(hopoEnabled), _subsMatrix(subsMatPath),
-      _hopoMatrix(hopoMatrixPath, _hopoEnabled), _generalPolisher(_subsMatrix),
-      _homoPolisher(_subsMatrix, _hopoMatrix), _dinucFixer(_subsMatrix),
-      _verbose(false), _showProgress(showProgress) {}
+    : _verbose(false), _showProgress(showProgress), _hopoEnabled(hopoEnabled),
+      _subsMatrix(subsMatPath), _hopoMatrix(hopoMatrixPath, _hopoEnabled),
+      _generalPolisher(_subsMatrix), _homoPolisher(_subsMatrix, _hopoMatrix),
+      _dinucFixer(_subsMatrix) {}
 
 void BubbleProcessor::polishAll(const std::string &inBubbles,
                                 const std::string &outConsensus,

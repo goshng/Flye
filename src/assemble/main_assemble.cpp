@@ -27,15 +27,16 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
                size_t &genomeSize, int &kmerSize, bool &debug,
                size_t &numThreads, int &minOverlap, std::string &configPath,
                int &minReadLength, bool &unevenCov, std::string &extraParams,
-               bool &shortMode) {
+               bool &shortMode, bool &directionalReads) {
   auto printUsage = []() {
     std::cerr
         << "Usage: flye-assemble "
         << " --reads path --out-asm path --config path [--genome-size size]\n"
         << "\t\t[--min-read length] [--log path] [--treads num] "
            "[--extra-params]\n"
-        << "\t\t[--kmer size] [--meta] [--short] [--min-ovlp size] [--debug] "
-           "[-h]\n\n"
+        << "\t\t[--kmer size] [--meta] [--short] [--min-ovlp size] [--debug]\n"
+        << "\t\t[--directional-reads]\n"
+        << "\t\t[-h]\n\n"
         << "Required arguments:\n"
         << "  --reads path\tcomma-separated list of read files\n"
         << "  --out-asm path\tpath to output file\n"
@@ -57,7 +58,9 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
         << "  --log log_file\toutput log to file "
         << "[default = not set] \n"
         << "  --threads num_threads\tnumber of parallel threads "
-        << "[default = 1] \n";
+        << "[default = 1] \n"
+        << "  --directional-reads \t\tfilter overlaps by direction "
+        << "[default = false] \n";
   };
 
   int optionIndex = 0;
@@ -74,6 +77,7 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
                                  {"meta", no_argument, 0, 0},
                                  {"short", no_argument, 0, 0},
                                  {"debug", no_argument, 0, 0},
+                                 {"directional-reads", no_argument, 0, 0},
                                  {0, 0, 0, 0}};
 
   int opt = 0;
@@ -93,6 +97,8 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
         logFile = optarg;
       else if (!strcmp(longOptions[optionIndex].name, "debug"))
         debug = true;
+      else if (!strcmp(longOptions[optionIndex].name, "directional-reads"))
+        directionalReads = true;
       else if (!strcmp(longOptions[optionIndex].name, "meta"))
         unevenCov = true;
       else if (!strcmp(longOptions[optionIndex].name, "short"))
@@ -123,7 +129,8 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
 }
 
 void removeContainedDisjointigs(std::vector<FastaRecord> &disjointigs,
-                                float divergenceThreshold) {
+                                float divergenceThreshold,
+                                bool directionalReads = false) {
   SequenceContainer disjSequences;
   for (auto &disj : disjointigs)
     disjSequences.addSequence(disj.sequence, disj.description);
@@ -142,7 +149,8 @@ void removeContainedDisjointigs(std::vector<FastaRecord> &disjointigs,
       /*store alignment*/ false,
       /*only max ovlp*/ true, divergenceThreshold,
       (bool)Config::get("reads_base_alignment"),
-      /*partition bad map*/ false, (bool)Config::get("hpc_scoring_on"));
+      /*partition bad map*/ false, (bool)Config::get("hpc_scoring_on"),
+      directionalReads); // Pass directionalReads to OverlapDetector
   OverlapContainer disjOverlaps(ovlp, disjSequences);
 
   Logger::get().info() << "Filtering contained disjointigs";
@@ -152,9 +160,13 @@ void removeContainedDisjointigs(std::vector<FastaRecord> &disjointigs,
     for (auto &ovlp : disjOverlaps.lazySeqOverlaps(seq.id)) {
       // Logger::get().debug() << disjSequences.seqName(ovlp.curId) << " " <<
       // ovlp.curLen << " " << 	ovlp.curBegin << " " << ovlp.curEnd << " " <<
-      //disjSequences.seqName(ovlp.extId)
+      // disjSequences.seqName(ovlp.extId)
       //	<< " " << ovlp.extLen << " " << ovlp.extBegin << " " <<
-      //ovlp.extEnd;
+      // ovlp.extEnd;
+
+      if (directionalReads && ovlp.curStrand != ovlp.extStrand) {
+        continue; // Skip mismatched directions
+      }
 
       bool contained =
           (std::max(ovlp.curBegin, ovlp.curLen - ovlp.curEnd) < FLANK) ||
@@ -191,6 +203,7 @@ int assemble_main(int argc, char **argv) {
   bool unevenCov = false;
   size_t numThreads = 1;
   bool shortMode = false;
+  bool directionalReads = false;
   std::string readsFasta;
   std::string outAssembly;
   std::string logFile;
@@ -199,7 +212,8 @@ int assemble_main(int argc, char **argv) {
 
   if (!parseArgs(argc, argv, readsFasta, outAssembly, logFile, genomeSize,
                  kmerSize, debugging, numThreads, minOverlap, configPath,
-                 minReadLength, unevenCov, extraParams, shortMode))
+                 minReadLength, unevenCov, extraParams, shortMode,
+                 directionalReads))
     return 1;
 
   Logger::get().setDebugging(debugging);
@@ -278,6 +292,8 @@ int assemble_main(int argc, char **argv) {
 
   Logger::get().debug() << "Peak RAM usage: "
                         << getPeakRSS() / 1024 / 1024 / 1024 << " Gb";
+  Logger::get().debug() << "Directional reads enabled: "
+                        << (directionalReads ? "Yes" : "No");
 
   // int maxOverlapsNum = !Parameters::get().unevenCoverage ? 5 * coverage : 0;
   OverlapDetector ovlp(
@@ -286,14 +302,15 @@ int assemble_main(int argc, char **argv) {
       /*store alignment*/ false,
       /*only max ovlp*/ true,
       /*no div threshold*/ 1.0f, (bool)Config::get("reads_base_alignment"),
-      /*partition bad map*/ false, (bool)Config::get("hpc_scoring_on"));
-  OverlapContainer readOverlaps(ovlp, readsContainer);
+      /*partition bad map*/ false, (bool)Config::get("hpc_scoring_on"),
+      directionalReads);
+  OverlapContainer readOverlaps(ovlp, readsContainer, directionalReads);
   readOverlaps.estimateOverlaperParameters();
   readOverlaps.setDivergenceThreshold(
       (float)Config::get("assemble_ovlp_divergence"),
       (bool)Config::get("assemble_divergence_relative"));
 
-  Extender extender(readsContainer, readOverlaps, minOverlap);
+  Extender extender(readsContainer, readOverlaps, minOverlap, directionalReads);
   extender.assembleDisjointigs();
   vertexIndex.clear();
 

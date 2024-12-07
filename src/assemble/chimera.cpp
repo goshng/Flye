@@ -30,6 +30,22 @@ bool ChimeraDetector::isChimeric(FastaRecord::Id readId,
                                  const std::vector<OverlapRange> &readOvlps) {
   // const int JUMP = Config::get("maximum_jump");
   if (!_chimeras.contains(readId)) {
+
+    // ** DIRECTIONAL CHANGE START **
+    // Filter overlaps based on strand orientation if directionalReads is
+    // enabled
+    std::vector<OverlapRange> filteredOvlps;
+    if (_directionalReads) {
+      for (const auto &ovlp : IterNoOverhang(readOvlps)) {
+        if (ovlp.curStrand == ovlp.extStrand) {
+          filteredOvlps.push_back(ovlp);
+        }
+      }
+    } else {
+      filteredOvlps = readOvlps;
+    }
+    // ** DIRECTIONAL CHANGE END **
+
     bool result = this->testReadByCoverage(readId, readOvlps);
     /*for (const auto& ovlp : IterNoOverhang(readOvlps))
     {
@@ -69,8 +85,30 @@ void ChimeraDetector::estimateGlobalCoverage() {
   for (const auto &seq : _seqContainer.iterSeqs()) {
     if (rand() % sampleRate)
       continue;
-    auto coverage =
-        this->getReadCoverage(seq.id, _ovlpContainer.lazySeqOverlaps(seq.id));
+
+    // ** DIRECTIONAL CHANGE START **
+    // Get overlaps considering directional reads
+    auto overlaps = _ovlpContainer.lazySeqOverlaps(seq.id);
+    // Filter overlaps for strand consistency if directionalReads is enabled
+    std::vector<OverlapRange> filteredOverlaps;
+    if (_directionalReads) {
+      for (const auto &ovlp : IterNoOverhang(overlaps)) {
+        if (ovlp.curStrand == ovlp.extStrand) {
+          filteredOverlaps.push_back(ovlp);
+        }
+      }
+    } else {
+      filteredOverlaps = overlaps;
+    }
+    // Calculate coverage based on filtered overlaps
+    auto coverage = this->getReadCoverage(seq.id, filteredOverlaps);
+
+    // dflye: replaces the following line.
+    // auto coverage = this->getReadCoverage(seq.id,
+    // _ovlpContainer.lazySeqOverlaps(seq.id));
+
+    // ** DIRECTIONAL CHANGE END **
+
     bool nonZero = false;
     for (auto c : coverage)
       nonZero |= (c != 0);
@@ -109,6 +147,13 @@ std::vector<int32_t> ChimeraDetector::getReadCoverage(
 
   coverage.assign(numWindows - 2 * FLANK, 0);
   for (const auto &ovlp : IterNoOverhang(readOverlaps)) {
+    // ** DIRECTIONAL CHANGE START **
+    // Skip overlaps with mismatched directions if directionalReads is enabled
+    if (_directionalReads && ovlp.curStrand != ovlp.extStrand) {
+      continue;
+    }
+    // ** DIRECTIONAL CHANGE END **
+
     if (ovlp.curId == ovlp.extId.rc() || ovlp.curId == ovlp.extId)
       continue;
 
@@ -118,6 +163,13 @@ std::vector<int32_t> ChimeraDetector::getReadCoverage(
          pos <= ovlp.curEnd / WINDOW - FLANK; ++pos) {
       // assert(pos - FLANK >= 0 && pos - FLANK < (int)coverage.size());
       ++coverage.at(pos - FLANK);
+      // dflye: suggested?
+      // Boundary Check for Robustness:
+      // Added an explicit boundary check in the loop to
+      // ensure pos - FLANK stays within the valid range of coverage:
+      /* if (pos - FLANK >= 0 && pos - FLANK < (int)coverage.size()) { */
+      /*   ++coverage.at(pos - FLANK); */
+      /* } */
     }
   }
 
@@ -152,7 +204,23 @@ bool ChimeraDetector::testReadByCoverage(
     FastaRecord::Id readId, const std::vector<OverlapRange> &readOvlps) {
   const float MAX_DROP_RATE = Config::get("max_coverage_drop_rate");
 
-  auto coverage = this->getReadCoverage(readId, readOvlps);
+  // ** DIRECTIONAL CHANGE START **
+  // Filter overlaps for strand consistency if directionalReads is enabled
+  std::vector<OverlapRange> filteredOverlaps;
+  if (_directionalReads) {
+    for (const auto &ovlp : IterNoOverhang(readOvlps)) {
+      if (ovlp.curStrand == ovlp.extStrand) {
+        filteredOverlaps.push_back(ovlp);
+      }
+    }
+  } else {
+    filteredOverlaps = readOvlps;
+  }
+  auto coverage = this->getReadCoverage(readId, filteredOverlaps);
+  // dflye: replaces the following line.
+  // auto coverage = this->getReadCoverage(readId, readOvlps);
+  // ** DIRECTIONAL CHANGE END **
+
   if (coverage.empty())
     return false;
 
@@ -309,6 +377,15 @@ ChimeraDetector::getCachedCoverage(FastaRecord::Id readId) {
   auto overlaps = _ovlpContainer.quickSeqOverlaps(readId, /*max ovlps*/ 0,
                                                   /*force local*/ true);
   for (const auto &ovlp : overlaps) {
+
+    // dflye: TODO: we may not need this if we have already filtered.
+    // ** DIRECTIONAL CHANGE START **
+    // Skip overlaps with mismatched directions if directionalReads is enabled
+    if (_directionalReads && ovlp.curStrand != ovlp.extStrand) {
+      continue;
+    }
+    // ** DIRECTIONAL CHANGE END **
+
     if (ovlp.curId == ovlp.extId.rc() || ovlp.curId == ovlp.extId)
       continue;
 

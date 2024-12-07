@@ -4,7 +4,7 @@ reads_file=flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
 out_dir=o
 
 flye_root=/home/goshng/all/polap/Flye
-out_dir=${flye_root}/o
+out_dir=${flye_root}/o-d
 rm -rf ${out_dir}
 mkdir -p \
 	${out_dir}/00-assembly \
@@ -25,12 +25,13 @@ bin/flye-modules assemble \
 	--threads 8 \
 	--debug \
 	--genome-size 500000 \
-	--min-ovlp 1000
+	--min-ovlp 1000 \
+	--directional-reads
 
 exit
 
 flye_root=/home/goshng/all/polap/Flye
-out_dir=${flye_root}/l
+out_dir=${flye_root}/l-d
 mkdir -p \
 	${out_dir}/00-assembly \
 	${out_dir}/10-consensus \
@@ -46,9 +47,11 @@ bin/flye-modules assemble \
 	--threads 8 \
 	--debug \
 	--genome-size 500000 \
-	--min-ovlp 1000
+	--min-ovlp 1000 \
+	--directional-reads
 
 exit
+
 rm -rf ${out_dir}
 bin/flye \
 	--pacbio-corr $reads_file \
@@ -56,7 +59,7 @@ bin/flye \
 exit
 
 flye_root=/home/goshng/all/polap/Flye
-out_dir=${flye_root}/o
+out_dir=${flye_root}/od
 mkdir -p \
 	${out_dir}/00-assembly \
 	${out_dir}/10-consensus \
@@ -68,7 +71,7 @@ mkdir -p \
 # input1: ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
 # output: ${out_dir}/00-assembly/draft_assembly.fasta
 #
-bin/flye-modules assemble \
+flye-modules assemble \
 	--reads ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz \
 	--out-asm ${out_dir}/00-assembly/draft_assembly.fasta \
 	--config ${flye_root}/flye/config/bin_cfg/asm_corrected_reads.cfg \
@@ -76,7 +79,8 @@ bin/flye-modules assemble \
 	--threads 8 \
 	--debug \
 	--genome-size 500000 \
-	--min-ovlp 1000
+	--min-ovlp 1000 \
+	--directional-reads
 
 # Stage: consensus 1
 # input: ${out_dir}/00-assembly/draft_assembly.fasta

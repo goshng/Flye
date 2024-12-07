@@ -30,6 +30,11 @@ bool OverlapDetector::overlapTest(const OverlapRange &ovlp,
     return false;
   }
 
+  // Filter overlaps with mismatched directions if directional reads are enabled
+  if (_directionalReads && ovlp.curStrand != ovlp.extStrand) {
+    return false;
+  }
+
   // filter overlaps that way to divergent in length.
   // theoretically, they should not pass sequence divergence filter,
   // but just in case
@@ -378,6 +383,17 @@ OverlapDetector::getSeqOverlaps(const FastaRecord &fastaRec, bool forceLocal,
       ovlp.score =
           scoreTable[lastMatch] - scoreTable[firstMatch] + kmerSize - 1;
 
+      // ** DIRECTIONAL CHANGE START **
+      // ** CHANGE: Set Strand Information **
+      ovlp.curStrand = fastaRec.id.strand(); // Set current strand
+      ovlp.extStrand =
+          matchesList.front().extId.strand(); // Set external strand
+
+      if (_directionalReads && ovlp.curStrand != ovlp.extStrand) {
+        continue; // Skip if directions do not align
+      }
+      // ** DIRECTIONAL CHANGE END **
+
       if (this->overlapTest(ovlp, forceLocal)) {
         if (_keepAlignment) {
           kmerMatches.emplace_back(ovlp.curBegin, ovlp.extBegin);
@@ -524,6 +540,18 @@ OverlapContainer::lazySeqOverlaps(FastaRecord::Id readId) {
   const FastaRecord &record = _queryContainer.getRecord(readId);
   auto overlaps = _ovlpDetect.getSeqOverlaps(
       record, DEFAULT_LOCAL, _divergenceStats, _ovlpDetect._maxCurOverlaps);
+
+  // ** DIRECTIONAL CHANGE START **
+  // Filter overlaps to enforce directional constraints
+  if (_directionalReads) {
+    overlaps.erase(std::remove_if(overlaps.begin(), overlaps.end(),
+                                  [](const OverlapRange &ovlp) {
+                                    return ovlp.curStrand != ovlp.extStrand;
+                                  }),
+                   overlaps.end());
+  }
+  // ** DIRECTIONAL CHANGE END **
+
   overlaps.shrink_to_fit();
 
   std::vector<OverlapRange> revOverlaps;
@@ -641,6 +669,18 @@ void OverlapContainer::filterOverlaps() {
   std::function<void(const FastaRecord::Id &seqId)> filterParallel =
       [this](const FastaRecord::Id &seqId) {
         auto &overlaps = this->unsafeSeqOverlaps(seqId);
+
+        // ** DIRECTIONAL CHANGE START **
+        // Filter overlaps to enforce directional constraints
+        if (_directionalReads) {
+          overlaps.erase(std::remove_if(overlaps.begin(), overlaps.end(),
+                                        [](const OverlapRange &ovlp) {
+                                          return ovlp.curStrand !=
+                                                 ovlp.extStrand;
+                                        }),
+                         overlaps.end());
+        }
+        // ** DIRECTIONAL CHANGE END **
 
         SetVec<OverlapRange *> overlapSets;
         for (auto &ovlp : overlaps) {

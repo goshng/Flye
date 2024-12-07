@@ -20,10 +20,11 @@ struct OverlapRange {
   OverlapRange(FastaRecord::Id curId = FastaRecord::ID_NONE,
                FastaRecord::Id extId = FastaRecord::ID_NONE,
                int32_t curInit = 0, int32_t extInit = 0, int32_t curLen = 0,
-               int32_t extLen = 0)
+               int32_t extLen = 0, bool curStrand = true, bool extStrand = true)
       : curId(curId), curBegin(curInit), curEnd(curInit), curLen(curLen),
         extId(extId), extBegin(extInit), extEnd(extInit), extLen(extLen),
-        score(0), seqDivergence(0.0f), kmerMatches(nullptr) {}
+        score(0), curStrand(curStrand), extStrand(extStrand),
+        seqDivergence(0.0f), kmerMatches(nullptr) {}
 
   ~OverlapRange() {
     if (kmerMatches) {
@@ -36,6 +37,7 @@ struct OverlapRange {
       : curId(other.curId), curBegin(other.curBegin), curEnd(other.curEnd),
         curLen(other.curLen), extId(other.extId), extBegin(other.extBegin),
         extEnd(other.extEnd), extLen(other.extLen), score(other.score),
+        curStrand(other.curStrand), extStrand(other.extStrand),
         seqDivergence(other.seqDivergence), kmerMatches(nullptr) {
     if (other.kmerMatches) {
       kmerMatches = new std::vector<std::pair<int32_t, int32_t>>();
@@ -53,6 +55,8 @@ struct OverlapRange {
     extEnd = other.extEnd;
     extLen = other.extLen;
     score = other.score;
+    curStrand = other.curStrand;
+    extStrand = other.extStrand;
     seqDivergence = other.seqDivergence;
 
     if (!other.kmerMatches) {
@@ -73,6 +77,7 @@ struct OverlapRange {
       : curId(other.curId), curBegin(other.curBegin), curEnd(other.curEnd),
         curLen(other.curLen), extId(other.extId), extBegin(other.extBegin),
         extEnd(other.extEnd), extLen(other.extLen), score(other.score),
+        curStrand(other.curStrand), extStrand(other.extStrand),
         seqDivergence(other.seqDivergence), kmerMatches(other.kmerMatches) {
     other.kmerMatches = nullptr;
   }
@@ -89,6 +94,8 @@ struct OverlapRange {
     std::swap(rev.curBegin, rev.extBegin);
     std::swap(rev.curEnd, rev.extEnd);
     std::swap(rev.curLen, rev.extLen);
+    rev.curStrand = !curStrand; // Reverse the strand
+    rev.extStrand = !extStrand;
 
     if (rev.kmerMatches) {
       for (auto &posPair : *rev.kmerMatches) {
@@ -120,6 +127,8 @@ struct OverlapRange {
 
     comp.curId = comp.curId.rc();
     comp.extId = comp.extId.rc();
+    comp.curStrand = !curStrand;
+    comp.extStrand = !extStrand;
 
     if (comp.kmerMatches) {
       for (auto &posPair : *comp.kmerMatches) {
@@ -193,14 +202,16 @@ struct OverlapRange {
     return std::min(extEnd, other.extEnd) - std::max(extBegin, other.extBegin);
   }
 
+  // dflye: TODO: dump output process needs to be changed.
   void dump(std::ostream &os, const SequenceContainer &curContainer,
             const SequenceContainer &extContainer) {
     os << curContainer.seqName(curId) << " " << curBegin << " " << curEnd << " "
-       << curLen << " " << extContainer.seqName(extId) << " " << extBegin << " "
-       << extEnd << " " << extLen << " " << -1 << " " << -1 << " " << score
-       << " " << seqDivergence;
+       << curLen << " " << curStrand << " " << extContainer.seqName(extId)
+       << " " << extBegin << " " << extEnd << " " << extLen << " " << extStrand
+       << " " << -1 << " " << -1 << " " << score << " " << seqDivergence;
   }
 
+  // dflye: TODO: load output process needs to be changed.
   void load(std::istream &is, const SequenceContainer &curContainer,
             const SequenceContainer &extContainer) {
     int32_t placeholderOne; // for backward compatibility
@@ -208,9 +219,9 @@ struct OverlapRange {
 
     std::string curSeqName;
     std::string extSeqName;
-    is >> curSeqName >> curBegin >> curEnd >> curLen >> extSeqName >>
-        extBegin >> extEnd >> extLen >> placeholderOne >> placeholderTwo >>
-        score >> seqDivergence;
+    is >> curSeqName >> curBegin >> curEnd >> curLen >> curStrand >>
+        extSeqName >> extBegin >> extEnd >> extLen >> extStrand >>
+        placeholderOne >> placeholderTwo >> score >> seqDivergence;
     curId = curContainer.recordByName(curSeqName).id;
     extId = extContainer.recordByName(extSeqName).id;
   }
@@ -238,6 +249,8 @@ struct OverlapRange {
   // int32_t rightShift;
 
   int32_t score;
+  bool curStrand;
+  bool extStrand;
   float seqDivergence;
 
   std::vector<std::pair<int32_t, int32_t>> *kmerMatches;
@@ -272,12 +285,14 @@ public:
                   const VertexIndex &vertexIndex, int maxJump, int minOverlap,
                   int maxOverhang, bool keepAlignment, bool onlyMaxExt,
                   float maxDivergence, bool nuclAlignment,
-                  bool partitionBadMappings, bool useHpc)
+                  bool partitionBadMappings, bool useHpc,
+                  bool directionalReads = false)
       : _maxJump(maxJump), _minOverlap(minOverlap), _maxOverhang(maxOverhang),
         _maxCurOverlaps(0), // no max overlaps
         _checkOverhang(maxOverhang > 0), _keepAlignment(keepAlignment),
         _onlyMaxExt(onlyMaxExt), _nuclAlignment(nuclAlignment),
         _partitionBadMappings(partitionBadMappings), _useHpc(useHpc),
+        _directionalReads(directionalReads), // New flag for directional reads
         _maxDivergence(maxDivergence),
         //_badEndAdjustment(badEndAdjustment),
         //_estimatorBias(0.0f),
@@ -303,6 +318,7 @@ private:
   const bool _nuclAlignment;
   const bool _partitionBadMappings;
   const bool _useHpc;
+  const bool _directionalReads; // New flag for directional reads
 
   mutable float _maxDivergence;
   // mutable float _badEndAdjustment;
@@ -315,10 +331,11 @@ private:
 class OverlapContainer {
 public:
   OverlapContainer(const OverlapDetector &ovlpDetect,
-                   const SequenceContainer &queryContainer)
+                   const SequenceContainer &queryContainer,
+                   bool directionalReads = false)
       : _ovlpDetect(ovlpDetect), _queryContainer(queryContainer), _indexSize(0),
         //_kmerIdyEstimateBias(0),
-        _meanTrueOvlpDiv(0) {}
+        _meanTrueOvlpDiv(0), _directionalReads(directionalReads) {}
 
   struct IndexVecWrapper {
     IndexVecWrapper()
@@ -382,7 +399,7 @@ private:
   std::vector<OverlapRange> &unsafeSeqOverlaps(FastaRecord::Id);
   // std::vector<OverlapRange>  seqOverlaps(FastaRecord::Id readId,
   //									   bool&
-  //outSuggestChimeric) const;
+  // outSuggestChimeric) const;
   void filterOverlaps();
 
   const OverlapDetector &_ovlpDetect;
@@ -396,6 +413,7 @@ private:
 
   // float _kmerIdyEstimateBias;
   float _meanTrueOvlpDiv;
+  bool _directionalReads; // New flag for directional reads
 };
 
 // a helper to iterate over overlaps with no overhangs

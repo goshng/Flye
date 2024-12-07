@@ -11,9 +11,10 @@
 class ChimeraDetector {
 public:
   ChimeraDetector(const SequenceContainer &readContainer,
-                  OverlapContainer &ovlpContainer)
+                  OverlapContainer &ovlpContainer,
+                  bool directionalReads = false)
       : _seqContainer(readContainer), _ovlpContainer(ovlpContainer),
-        _overlapCoverage(0) {}
+        _overlapCoverage(0), _directionalReads(directionalReads) {}
 
   void estimateGlobalCoverage();
   bool isChimeric(FastaRecord::Id readId,
@@ -49,4 +50,5 @@ private:
   cuckoohash_map<FastaRecord::Id, bool> _chimeras;
   cuckoohash_map<FastaRecord::Id, CachedCoverage> _localOvlpsStorage;
   int _overlapCoverage;
+  bool _directionalReads;
 };

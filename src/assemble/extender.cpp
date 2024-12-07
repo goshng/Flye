@@ -15,19 +15,34 @@
 
 namespace {
 OverlapRange getOverlapBetween(OverlapContainer &ovlpCnt,
-                               FastaRecord::Id readOne,
-                               FastaRecord::Id readTwo) {
+                               FastaRecord::Id readOne, FastaRecord::Id readTwo,
+                               bool directionalReads = false) {
   bool found = false;
   OverlapRange readsOvlp;
 
   for (const auto &ovlp : ovlpCnt.lazySeqOverlaps(readOne)) {
+    // ** DIRECTIONAL CHANGE START **
+    if (directionalReads && ovlp.curStrand != ovlp.extStrand) {
+      Logger::get().debug() << "directions";
+      continue; // Skip overlaps with mismatched directions
+    }
+    // ** DIRECTIONAL CHANGE END **
     if (ovlp.extId == readTwo) {
       readsOvlp = ovlp;
       found = true;
       break;
     }
   }
+
+  // Check overlaps from readTwo to readOne
   for (const auto &ovlp : ovlpCnt.lazySeqOverlaps(readTwo)) {
+    // ** DIRECTIONAL CHANGE START **
+    if (directionalReads && ovlp.curStrand != ovlp.extStrand) {
+      Logger::get().debug() << "directions";
+      continue; // Skip overlaps with mismatched directions
+    }
+    // ** DIRECTIONAL CHANGE END **
+
     if (ovlp.extId == readOne) {
       if (!found || readsOvlp.minRange() < ovlp.minRange()) {
         readsOvlp = ovlp.reverse();
@@ -71,10 +86,20 @@ Extender::ExtensionInfo Extender::extendDisjointig(FastaRecord::Id startRead) {
     const std::vector<OverlapRange> &curOverlaps =
         _ovlpContainer.lazySeqOverlaps(currentRead);
     std::vector<OverlapRange> extensions;
+
     for (const auto &ovlp : IterNoOverhang(curOverlaps)) {
+      // ** DIRECTIONAL CHANGE START **
+      // Filter overlaps based on strand orientation if directional reads are
+      // enabled
+      if (_directionalReads && ovlp.curStrand != ovlp.extStrand) {
+        Logger::get().debug() << "directions";
+        continue; // Skip overlaps with mismatched directions
+      }
+      // ** DIRECTIONAL CHANGE END **
       if (this->extendsRight(ovlp))
         extensions.push_back(ovlp);
     }
+
     numExtensions.push_back(extensions.size());
 
     // sort from longes to shortest overlap
@@ -180,9 +205,11 @@ Extender::ExtensionInfo Extender::extendDisjointig(FastaRecord::Id startRead) {
       overlapSizes.push_back(selectedExtension->curRange());
 
       //_chimDetector.isRepetitiveRegion(selectedExtension->curId,
-      //selectedExtension->curBegin, 								 selectedExtension->curEnd, true);
+      // selectedExtension->curBegin,
+      // selectedExtension->curEnd, true);
       //_chimDetector.isRepetitiveRegion(selectedExtension->extId,
-      //selectedExtension->extBegin, 								 selectedExtension->extEnd, true);
+      // selectedExtension->extBegin,
+      // selectedExtension->extEnd, true);
     } else {
       rightExtension ? exInfo.leftTip = true : exInfo.rightTip = true;
     }
@@ -241,6 +268,7 @@ void Extender::assembleDisjointigs() {
   _innerReads.clear();
   cuckoohash_map<FastaRecord::Id, size_t> coveredReads;
 
+  // Filter reads that are long enough and are on the forward strand
   std::vector<FastaRecord::Id> allReads;
   for (const auto &seq : _readsContainer.iterSeqs()) {
     if (seq.sequence.length() > (size_t)Parameters::get().minimumOverlap &&
@@ -280,6 +308,21 @@ void Extender::assembleDisjointigs() {
     // int minStartExt = 1;
     // int extLeft = this->countLeftExtensions(startOvlps);
     // int extRight = this->countRightExtensions(startOvlps);
+
+    // ** DIRECTIONAL CHANGE START **
+    // Consider overlaps based on strand orientation if directionalReads is
+    // enabled
+    for (const auto &ovlp : IterNoOverhang(startOvlps)) {
+      if (_directionalReads && ovlp.curStrand != ovlp.extStrand) {
+        Logger::get().debug() << "directions";
+        continue; // Skip overlaps with mismatched directions
+      }
+      if (_innerReads.contains(ovlp.extId)) {
+        ++numInnerOvlp;
+      }
+      ++totalOverlaps;
+    }
+    // ** DIRECTIONAL CHANGE END **
 
     if (_chimDetector.isChimeric(startRead, startOvlps) ||
         _readsContainer.seqLen(startRead) < _safeOverlap)
@@ -349,6 +392,12 @@ void Extender::assembleDisjointigs() {
 
       for (const auto &ovlp :
            IterNoOverhang(_ovlpContainer.lazySeqOverlaps(readId))) {
+        // ** DIRECTIONAL CHANGE START **
+        if (_directionalReads && ovlp.curStrand != ovlp.extStrand) {
+          Logger::get().debug() << "directions";
+          continue; // Skip overlaps with mismatched directions
+        }
+        // ** DIRECTIONAL CHANGE END **
         allOverlaps.push_back(ovlp);
         if (ovlp.minRange() > _safeOverlap) {
           coveredReads.insert(ovlp.extId, true);
@@ -439,6 +488,14 @@ Extender::getInnerReads(const std::vector<OverlapRange> &ovlps) {
 
   std::unordered_map<FastaRecord::Id, std::vector<int32_t>> readsCoverage;
   for (const auto &ovlp : ovlps) {
+    // ** DIRECTIONAL CHANGE START **
+    // Skip overlaps with mismatched directions if directionalReads is enabled
+    if (_directionalReads && ovlp.curStrand != ovlp.extStrand) {
+      Logger::get().debug() << "directions";
+      continue;
+    }
+    // ** DIRECTIONAL CHANGE END **
+
     auto &coverage = readsCoverage[ovlp.extId];
     if (coverage.empty()) {
       int numWindows = _readsContainer.seqLen(ovlp.extId) / WINDOW;
@@ -503,12 +560,15 @@ void Extender::convertToDisjointigs() {
     }
     // path.trimLeft = std::max(0, exInfo.leftAsmOverlap -
     //							2 *
-    //Parameters::get().minimumOverlap); path.trimRight = std::max(0,
-    // exInfo.rightAsmOverlap - 							 2 * Parameters::get().minimumOverlap);
+    // Parameters::get().minimumOverlap); path.trimRight = std::max(0,
+    // exInfo.rightAsmOverlap -
+    // 2 * Parameters::get().minimumOverlap);
 
     for (size_t i = 0; i < exInfo.reads.size() - 1; ++i) {
-      auto readsOvlp = getOverlapBetween(_ovlpContainer, exInfo.reads[i],
-                                         exInfo.reads[i + 1]);
+      // dflye: Retrieve overlaps considering directional reads
+      auto readsOvlp =
+          getOverlapBetween(_ovlpContainer, exInfo.reads[i],
+                            exInfo.reads[i + 1], _directionalReads);
       path.sequences.push_back(_readsContainer.getSeq(exInfo.reads[i]));
       path.overlaps.push_back(readsOvlp);
     }
@@ -521,6 +581,14 @@ int Extender::countRightExtensions(
     const std::vector<OverlapRange> &ovlps) const {
   int count = 0;
   for (const auto &ovlp : IterNoOverhang(ovlps)) {
+    // ** DIRECTIONAL CHANGE START **
+    // Skip overlaps with mismatched directions if directionalReads is enabled
+    if (_directionalReads && ovlp.curStrand != ovlp.extStrand) {
+      Logger::get().debug() << "directions";
+      continue;
+    }
+    // ** DIRECTIONAL CHANGE END **
+
     if (this->extendsRight(ovlp))
       ++count;
   }
@@ -535,6 +603,15 @@ this->countRightExtensions(_ovlpContainer.lazySeqOverlaps(readId));
 
 bool Extender::extendsRight(const OverlapRange &ovlp) const {
   static const int MAX_JUMP = Config::get("maximum_jump");
+
+  // ** DIRECTIONAL CHANGE START **
+  // Ensure directional consistency if directional reads are enabled
+  if (_directionalReads && ovlp.curStrand != ovlp.extStrand) {
+    Logger::get().debug() << "directions";
+    return false;
+  }
+  // ** DIRECTIONAL CHANGE END **
+
   return ovlp.rightShift() > MAX_JUMP;
 }
 
@@ -542,6 +619,15 @@ int Extender::countLeftExtensions(
     const std::vector<OverlapRange> &ovlps) const {
   int count = 0;
   for (const auto &ovlp : IterNoOverhang(ovlps)) {
+
+    // ** DIRECTIONAL CHANGE START **
+    // Skip overlaps with mismatched directions if directionalReads is enabled
+    if (_directionalReads && ovlp.curStrand != ovlp.extStrand) {
+      Logger::get().debug() << "directions";
+      continue;
+    }
+    // ** DIRECTIONAL CHANGE END **
+
     if (this->extendsLeft(ovlp))
       ++count;
   }
@@ -550,5 +636,14 @@ int Extender::countLeftExtensions(
 
 bool Extender::extendsLeft(const OverlapRange &ovlp) const {
   static const int MAX_JUMP = Config::get("maximum_jump");
+
+  // ** DIRECTIONAL CHANGE START **
+  // Ensure directional consistency if directionalReads is enabled
+  if (_directionalReads && ovlp.curStrand != ovlp.extStrand) {
+    Logger::get().debug() << "directions";
+    return false;
+  }
+  // ** DIRECTIONAL CHANGE END **
+
   return ovlp.leftShift() < -MAX_JUMP;
 }
