@@ -2,6 +2,11 @@
 # reads_file=flye/tests/data/ecoli_500kb.fasta
 reads_file=flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
 out_dir=o
+rm -rf ${out_dir}
+bin/flye \
+	--pacbio-corr $reads_file \
+	--debug -g 500k -o $out_dir -t 8 -m 1000
+exit
 
 flye_root=/home/goshng/all/polap/Flye
 out_dir=${flye_root}/o
@@ -49,6 +54,7 @@ bin/flye-modules assemble \
 	--min-ovlp 1000
 
 exit
+
 rm -rf ${out_dir}
 bin/flye \
 	--pacbio-corr $reads_file \

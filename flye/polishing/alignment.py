@@ -39,10 +39,10 @@ def check_binaries():
 
 
 def make_alignment(
-    reference_file, reads_file, num_proc, platform, read_type, out_alignment
+    args, reference_file, reads_file, num_proc, platform, read_type, out_alignment
 ):
     mode = platform + "-" + read_type
-    _run_minimap(reference_file, reads_file, num_proc, mode, out_alignment)
+    _run_minimap(args, reference_file, reads_file, num_proc, mode, out_alignment)
 
 
 def get_contigs_info(contigs_file):
@@ -232,7 +232,7 @@ def merge_chunks(fasta_in, fold_function=lambda l: "".join(l)):
     return out_dict
 
 
-def _run_minimap(reference_file, reads_files, num_proc, reads_type, out_file):
+def _run_minimap(args, reference_file, reads_files, num_proc, reads_type, out_file):
     # SAM_HEADER = "\'@PG|@HD|@SQ|@RG|@CO\'"
     work_dir = os.path.dirname(out_file)
     stderr_file = os.path.join(work_dir, "minimap.stderr")
@@ -292,6 +292,14 @@ def _run_minimap(reference_file, reads_files, num_proc, reads_type, out_file):
     cmdline.extend(
         ["|", SAMTOOLS_BIN, "view", "-T", "'" + reference_file + "'", "-u", "-"]
     )
+
+    if args.directional_reads:
+        cmdline.extend(["|", SAMTOOLS_BIN, "view", "-h", "-"])
+        cmdline.extend(
+            ["|", "awk", "'{if ($1 ~ /^@/ || int($2 / 16) % 2 == 0) print $0}'"]
+        )
+        cmdline.extend(["|", SAMTOOLS_BIN, "view", "-bS", "-"])
+
     cmdline.extend(
         [
             "|",

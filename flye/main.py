@@ -324,6 +324,7 @@ class JobConsensus(Job):
         logger.info("Running Minimap2")
         out_alignment = os.path.join(self.consensus_dir, "minimap.bam")
         aln.make_alignment(
+            self.args,
             self.in_contigs,
             self.args.reads,
             self.args.threads,
@@ -345,7 +346,7 @@ class JobConsensus(Job):
         )
 
         fp.write_fasta_dict(consensus_fasta, self.out_consensus)
-        os.remove(out_alignment)
+        # os.remove(out_alignment)
 
 
 class JobPolishing(Job):
@@ -640,7 +641,7 @@ def _usage():
         "\t     [--keep-haplotypes] [--debug] [--version] [--help] \n"
         "\t     [--scaffold] [--resume] [--resume-from] [--stop-after] \n"
         "\t     [--read-error float] [--extra-params] \n"
-        "\t     [--deterministic]"
+        "\t     [--deterministic] [--directional-reads]\n"
     )
 
 
@@ -910,6 +911,14 @@ def main():
         default=False,
         help="enable debug output",
     )
+    parser.add_argument(
+        "--directional-reads",
+        action="store_true",
+        dest="directional_reads",
+        default=False,
+        help="Enable strand-specific read assembly.",
+    )
+
     parser.add_argument("-v", "--version", action="version", version=_version())
     parser.add_argument(
         "--deterministic",

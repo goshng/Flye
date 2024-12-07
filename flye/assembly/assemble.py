@@ -56,6 +56,8 @@ def assemble(args, run_params, out_file, log_file, config_path):
         cmdline.append("--debug")
     if args.meta:
         cmdline.append("--meta")
+    if args.directional_reads:
+        cmdline.append("--directional-reads")
     # if args.short_mode:
     #    cmdline.append("--short")
     if args.genome_size:
