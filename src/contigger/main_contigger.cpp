@@ -198,7 +198,7 @@ int contigger_main(int argc, char **argv) {
   // seqAssembly.buildPositionIndex();
 
   SequenceContainer emptyContainer;
-  RepeatGraph rg(emptyContainer, &seqGraphEdges);
+  RepeatGraph rg(emptyContainer, &seqGraphEdges, directionalReads);
   rg.loadGraph(inRepeatGraph);
   // rg.validateGraph();
   ReadAligner aln(rg, seqReads, directionalReads);
@@ -207,7 +207,7 @@ int contigger_main(int argc, char **argv) {
 
   // Logger::get().info() << "Generating contigs";
 
-  ContigExtender extender(rg, aln, emptyContainer, seqReads);
+  ContigExtender extender(rg, aln, emptyContainer, seqReads, directionalReads);
   extender.generateUnbranchingPaths();
   extender.generateContigs();
   extender.outputContigs(outFolder + "/contigs.fasta");

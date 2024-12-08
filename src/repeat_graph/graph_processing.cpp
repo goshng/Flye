@@ -244,6 +244,7 @@ int GraphProcessor::condenceEdges() {
       GraphEdge addFwd = edge;
       addFwd.edgeId = _graph.newEdgeId();
 
+      // dflye: why add reverse edge?
       GraphEdge addRev(_graph.complementNode(edge.nodeRight),
                        _graph.complementNode(edge.nodeLeft),
                        addFwd.edgeId.rc());

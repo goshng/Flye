@@ -89,9 +89,12 @@ void RepeatGraph::build(bool keepHaplotypes) {
       /*no overhang*/ 0, /*keep alignment*/ true,
       /*only max*/ false, (float)Config::get("repeat_graph_ovlp_divergence"),
       /*nucl alignment*/ true,
-      /*partition bad map*/ true, (bool)Config::get("hpc_scoring_on"));
+      /*partition bad map*/ true, (bool)Config::get("hpc_scoring_on"),
+      _directionalReads // dflye: Pass directionalReads to OverlapDetector
+  );
 
-  OverlapContainer asmOverlaps(asmOverlapper, _asmSeqs);
+  // dflye: Pass directionalReads to OverlapContainer
+  OverlapContainer asmOverlaps(asmOverlapper, _asmSeqs, _directionalReads);
   asmOverlaps.findAllOverlaps();
   asmOverlaps.buildIntervalTree();
   asmOverlaps.overlapDivergenceStats();
@@ -127,6 +130,8 @@ void RepeatGraph::getGluepoints(OverlapContainer &asmOverlaps) {
   // each point has X and Y coordinates (curSeq and extSeq)
   for (auto &seq : _asmSeqs.iterSeqs()) {
     for (auto &ovlp : asmOverlaps.lazySeqOverlaps(seq.id)) {
+      if (_directionalReads && !seq.id.strand())
+        continue; // dflye: Skip reverse strand if directional
       endpoints[ovlp.curId].push_back(new SetPoint2d(
           Point2d(ovlp.curId, ovlp.curBegin, ovlp.extId, ovlp.extBegin)));
       endpoints[ovlp.curId].push_back(new SetPoint2d(
@@ -164,8 +169,10 @@ void RepeatGraph::getGluepoints(OverlapContainer &asmOverlaps) {
   for (auto &clustEndpoints : clusters) {
     // first, simply add projections for each point from the cluster
     FastaRecord::Id clustSeq = clustEndpoints.second.front().curId;
-    if (!clustSeq.strand())
-      continue; // only for forward strands
+
+    // Skip reverse strand only if directional reads are enabled
+    if (_directionalReads && !clustSeq.strand())
+      continue; // dflye: Skip reverse strand if directional
 
     std::vector<int32_t> positions;
     for (auto &ep : clustEndpoints.second) {
@@ -401,8 +408,8 @@ void RepeatGraph::checkGluepointProjections(
 
     // for (auto& gp : _gluePoints)
     for (auto &seq : _asmSeqs.iterSeqs()) {
-      if (!seq.id.strand())
-        continue;
+      if (_directionalReads && !seq.id.strand())
+        continue; // dflye: Skip reverse strand if directional
       if (!_gluePoints.count(seq.id))
         continue;
       auto &gp = _gluePoints[seq.id];
@@ -462,8 +469,8 @@ void RepeatGraph::checkGluepointProjections(
 
     int totalAdded = 0;
     for (auto &ptVec : addedGluepoints) {
-      if (!ptVec.first.strand())
-        continue;
+      if (_directionalReads && !ptVec.first.strand())
+        continue; // dflye: Skip reverse strand if directional
 
       std::vector<size_t> permutation;
       for (size_t i = 0; i < ptVec.second.size(); ++i)
@@ -607,6 +614,7 @@ void RepeatGraph::collapseTandems() {
       }
       leftId = rightId;
     }
+    /* dflye: suggestion: seqPoints.second = std::move(newPoints); */
     seqPoints.second = newPoints;
   }
 
@@ -634,7 +642,8 @@ void RepeatGraph::initializeEdges(const OverlapContainer &asmOverlaps) {
   // for (auto& seqEdgesPair : _gluePoints)
   size_t checksum = 0;
   for (auto &seq : _asmSeqs.iterSeqs()) {
-    if (!seq.id.strand())
+    // dflye: Skip reverse strands when directional reads are enabled
+    if (_directionalReads && !seq.id.strand())
       continue;
     if (!_gluePoints.count(seq.id))
       continue;
@@ -933,8 +942,10 @@ void RepeatGraph::logEdges() {
 
   // for (auto& seqEdgesPair : sequenceEdges)
   for (auto &seq : _asmSeqs.iterSeqs()) {
-    if (!seq.id.strand())
+    // dflye: Skip reverse strands when _directionalReads is enabled
+    if (_directionalReads && !seq.id.strand())
       continue;
+
     if (!sequenceEdges.count(seq.id))
       continue;
     auto &seqEdgesVec = sequenceEdges[seq.id];
@@ -1128,6 +1139,7 @@ void RepeatGraph::loadGraph(const std::string &filename) {
   }
 
   std::unordered_map<size_t, GraphNode *> idToNode;
+  /* GraphEdge *currentEdge = nullptr; // dflye: Use nullptr for clarity */
   GraphEdge *currentEdge = 0;
   while (true) {
     std::string buffer;
@@ -1156,7 +1168,9 @@ void RepeatGraph::loadGraph(const std::string &filename) {
           edge.meanCoverage >> edge.altGroupId;
       if (edge.altGroupId != -1)
         edge.altHaplotype = true;
+
       currentEdge = this->addEdge(std::move(edge));
+
     } else if (buffer == "Sequence") {
       if (!currentEdge)
         std::runtime_error("Error parsing: " + filename);

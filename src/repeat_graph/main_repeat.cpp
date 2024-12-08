@@ -192,7 +192,7 @@ int repeat_main(int argc, char **argv) {
   Logger::get().info() << "Building repeat graph";
   SequenceContainer edgeSequences;
   // dflye:
-  RepeatGraph rg(seqAssembly, &edgeSequences);
+  RepeatGraph rg(seqAssembly, &edgeSequences, directionalReads);
   // dflye:
   rg.build(keepHaplotypes);
   // rg.validateGraph();

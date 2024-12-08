@@ -168,14 +168,18 @@ void ReadAligner::alignReads() {
 
   // pathsIndex.countKmers(/*min freq*/ 1, /* genome size*/ 0);
   // pathsIndex.buildIndex(/*min freq*/ 1);
+  //
+  // dflye: add _directionalReads as the last argument.
   OverlapDetector readsOverlapper(
       _graph.edgeSequences(), pathsIndex, (int)Config::get("maximum_jump"),
       SMALL_ALN,
       /*no overhang*/ 0, /*keep alignment*/ false,
       /*only max*/ false, /*no max divergence*/ 1.0f,
       /*nucl alignment*/ false,
-      /*partition bad map*/ false, (bool)Config::get("hpc_scoring_on"));
-  OverlapContainer readsOverlaps(readsOverlapper, _readSeqs);
+      /*partition bad map*/ false, (bool)Config::get("hpc_scoring_on"),
+      _directionalReads);
+  OverlapContainer readsOverlaps(readsOverlapper, _readSeqs, _directionalReads);
+  // dflye: add _directionalReads as the last argument.
 
   std::vector<FastaRecord::Id> allQueries;
   int64_t totalLength = 0;

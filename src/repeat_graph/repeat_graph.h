@@ -13,17 +13,21 @@
 #include "../sequence/sequence_container.h"
 
 struct EdgeSequence {
+  // dflye: Constructor for edge sequences with optional strand information
   EdgeSequence(FastaRecord::Id edgeSeqId = FastaRecord::ID_NONE,
-               int32_t seqLen = 0)
+               int32_t seqLen = 0, bool isForwardStrand = true)
       : edgeSeqId(edgeSeqId), seqLen(seqLen), origSeqId(FastaRecord::ID_NONE),
-        origSeqLen(0), origSeqStart(0), origSeqEnd(0) {}
+        origSeqLen(0), origSeqStart(0), origSeqEnd(0),
+        isForwardStrand(isForwardStrand) {} // dflye: Initialize strand
 
+  // dflye: Constructor for sequences derived from original data
   EdgeSequence(FastaRecord::Id origSeq, int32_t origLen, int32_t origSeqStart,
-               int32_t origSeqEnd)
+               int32_t origSeqEnd, bool isForwardStrand = true)
       : edgeSeqId(FastaRecord::ID_NONE), seqLen(origSeqEnd - origSeqStart),
         origSeqId(origSeq), origSeqLen(origLen), origSeqStart(origSeqStart),
-        origSeqEnd(origSeqEnd) {}
+        origSeqEnd(origSeqEnd), isForwardStrand(isForwardStrand) {} // dflye
 
+  // dflye: Complement sequence with strand inversion
   EdgeSequence complement() const {
     EdgeSequence other(*this);
     other.edgeSeqId = edgeSeqId.rc();
@@ -32,28 +36,37 @@ struct EdgeSequence {
       other.origSeqStart = origSeqLen - origSeqEnd - 1;
       other.origSeqEnd = origSeqLen - origSeqStart - 1;
     }
+    other.isForwardStrand = !isForwardStrand; // dflye: Invert strand
     return other;
   }
 
+  // dflye: Equality operator updated to include strand
   bool operator==(const EdgeSequence &other) {
     return edgeSeqId == other.edgeSeqId && seqLen == other.seqLen &&
            origSeqId == other.origSeqId && origSeqLen == other.origSeqLen &&
-           origSeqStart == other.origSeqStart && origSeqEnd == other.origSeqEnd;
+           origSeqStart == other.origSeqStart &&
+           origSeqEnd == other.origSeqEnd &&
+           isForwardStrand == other.isForwardStrand; // dflye
   }
 
+  // dflye: Dump sequence information, including strand
   void dump(std::ostream &os, const SequenceContainer &edgesSeqs) {
     std::string origIdString = origSeqId != FastaRecord::ID_NONE
                                    ? std::to_string(origSeqId.signedId())
                                    : "*";
+    std::string strand = isForwardStrand ? "+" : "-"; // dflye
     os << edgesSeqs.seqName(edgeSeqId) << " " << seqLen << " " << origIdString
-       << " " << origSeqLen << " " << origSeqStart << " " << origSeqEnd;
+       << " " << origSeqLen << " " << origSeqStart << " " << origSeqEnd << " "
+       << strand; // dflye: Include strand
   }
 
+  // dflye: Parse sequence information, including strand
   void parse(std::istream &is, const SequenceContainer &edgeSeqs) {
     std::string edgeSeqName;
     std::string origSeqName;
+    std::string strand; // dflye: Added strand parsing
     is >> edgeSeqName >> seqLen >> origSeqName >> origSeqLen >> origSeqStart >>
-        origSeqEnd;
+        origSeqEnd >> strand; // dflye
     edgeSeqId = edgeSeqs.recordByName(edgeSeqName).id;
 
     if (origSeqName == "*") {
@@ -63,6 +76,8 @@ struct EdgeSequence {
       unsignedId += atoll(origSeqName.c_str()) < 0;
       origSeqId = FastaRecord::Id(unsignedId);
     }
+
+    isForwardStrand = (strand == "+"); // dflye: Parse strand
   }
 
   // index in the repeat graph sequence container
@@ -77,11 +92,15 @@ struct EdgeSequence {
   int32_t origSeqLen;
   int32_t origSeqStart;
   int32_t origSeqEnd;
+
+  // dflye: Member to track strand direction
+  bool isForwardStrand;
 };
 
 struct GraphNode;
 
 struct GraphEdge {
+  // Constructor with optional strand information
   GraphEdge(GraphNode *nodeLeft, GraphNode *nodeRight,
             FastaRecord::Id edgeId = FastaRecord::ID_NONE)
       : nodeLeft(nodeLeft), nodeRight(nodeRight), edgeId(edgeId),
@@ -106,14 +125,30 @@ struct GraphEdge {
     return sumLen / seqSegments.size();
   }
 
+  // dflye: Long descriptor for debugging/logging
+  /* std::string edgeDescrLong() const { */
+  /*   return "{" + std::to_string(edgeId.signedId()) + "," + */
+  /*          std::to_string(length()) + "," + std::to_string(meanCoverage) +
+   * "}"; */
+  /* } */
   std::string edgeDescrLong() const {
     return "{" + std::to_string(edgeId.signedId()) + "," +
-           std::to_string(length()) + "," + std::to_string(meanCoverage) + "}";
+           std::to_string(length()) + "," + std::to_string(meanCoverage) + "," +
+           (isForward() ? "+" : "-") + "}"; // dflye: Include strand
   }
 
-  std::string edgeDescr() const { return std::to_string(edgeId.signedId()); }
+  // dflye: Short descriptor for debugging/logging
+  /* std::string edgeDescr() const { return std::to_string(edgeId.signedId()); }
+   */
+  std::string edgeDescr() const {
+    return std::to_string(edgeId.signedId()) +
+           (isForward() ? "+" : "-"); // dflye: Include strand
+  }
 
-  bool isForwardStrand() const { return edgeId.strand(); }
+  // dflye: Check if the edge is forward
+  bool isForward() const {
+    return edgeId.strand();
+  } // Compute directly from edgeId
 
   std::unordered_set<GraphEdge *> adjacentEdges();
 
@@ -213,9 +248,11 @@ typedef std::vector<GraphEdge *> GraphPath;
 
 class RepeatGraph {
 public:
-  RepeatGraph(const SequenceContainer &asmSeqs, SequenceContainer *graphSeqs)
+  RepeatGraph(const SequenceContainer &asmSeqs, SequenceContainer *graphSeqs,
+              bool directionalReads = false)
       : _nextEdgeId(0), _nextNodeId(0), _asmSeqs(asmSeqs),
-        _edgeSeqsContainer(graphSeqs) {}
+        _edgeSeqsContainer(graphSeqs), _directionalReads(directionalReads) {}
+
   ~RepeatGraph();
 
   void build(bool keepHaplotypes);
@@ -265,6 +302,10 @@ public:
     newEdge->nodeRight->inEdges.push_back(newEdge);
     _sortedEdges.insert(newEdge);
     _idToEdge[newEdge->edgeId] = newEdge;
+    if (newEdge->selfComplement) {
+      _idToEdge[newEdge->edgeId.rc()] = newEdge;
+    }
+    // dflye: Handle complementary edge to support strand-awareness
     if (newEdge->selfComplement) {
       _idToEdge[newEdge->edgeId.rc()] = newEdge;
     }
@@ -411,4 +452,6 @@ private:
     }
   };
   std::set<GraphEdge *, CmpId> _sortedEdges;
+
+  bool _directionalReads; // dflye:
 };

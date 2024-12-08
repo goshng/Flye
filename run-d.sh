@@ -4,15 +4,19 @@
 
 flye_root=/home/goshng/all/polap/Flye
 out_dir=${flye_root}/o-d
+ecoli_hifi_fastq=${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
+both_fastq=${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
+forward_fastq=${out_dir}/00-assembly/forward.fq
+forward_paf=${out_dir}/00-assembly/forward.paf
 
-mkdir -p ${out_dir}/30-contigger
-bin/flye-modules contigger \
-	--graph-edges ${out_dir}/20-repeat/repeat_graph_edges.fasta \
-	--reads ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz \
-	--out-dir ${out_dir}/30-contigger \
+# repeat graph with the forward filtered data
+rm -rf ${out_dir}/20-repeat
+mkdir -p ${out_dir}/20-repeat
+bin/flye-modules repeat \
+	--disjointigs ${out_dir}/path1.fasta \
+	--reads ${both_fastq} \
+	--out-dir ${out_dir}/20-repeat \
 	--config ${flye_root}/flye/config/bin_cfg/asm_corrected_reads.cfg \
-	--repeat-graph ${out_dir}/20-repeat/repeat_graph_dump \
-	--graph-aln ${out_dir}/20-repeat/read_alignment_dump \
 	--log ${out_dir}/flye.log \
 	--threads 8 \
 	--debug \
@@ -20,7 +24,27 @@ bin/flye-modules contigger \
 	--directional-reads
 exit
 
+# Filter out reverse-complementary reads
+bin/flye-minimap2 \
+	${out_dir}/path1.fasta \
+	${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz \
+	-x map-pb -t 8 -a -p 0.5 -N 10 \
+	--sam-hit-only -L -K 1G -z 1000 -Q \
+	--secondary-seq -I 64G |
+	bin/flye-samtools fastq -G 16 - >${forward_fastq}
+exit
+
+# Check the forward mapping
+bin/flye-minimap2 \
+	${out_dir}/path1.fasta \
+	${forward_fastq} \
+	-x map-pb -t 8 -p 0.5 -N 10 \
+	--sam-hit-only -L -K 1G -z 1000 -Q \
+	--secondary-seq -I 64G >${forward_paf}
+exit
+
 # All
+#
 rm -rf ${out_dir}
 bin/flye \
 	--pacbio-corr ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz \
@@ -28,23 +52,6 @@ bin/flye \
 	--directional-reads \
 	--debug \
 	-g 500k -o $out_dir -t 8 -m 1000
-exit
-
-# Stage: consensus 1
-# input: ${out_dir}/00-assembly/draft_assembly.fasta
-# output: ${out_dir}/10-consensus/minimap.bam
-#
-bin/flye-minimap2 \
-	${out_dir}/00-assembly/draft_assembly.fasta \
-	${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz -x map-pb -t 8 -a -p 0.5 -N 10 \
-	--sam-hit-only -L -K 1G -z 1000 -Q \
-	--secondary-seq -I 64G |
-	bin/flye-samtools view -T ${out_dir}/00-assembly/draft_assembly.fasta -u - |
-	bin/flye-samtools view -h - |                              # dflye:
-	awk '{if ($1 ~ /^@/ || int($2 / 16) % 2 == 0) print $0}' | # dflye: Filter for forward-forward reads
-	bin/flye-samtools view -bS - |                             # dflye: Convert filtered SAM back to BAM
-	bin/flye-samtools sort -T ${out_dir}/10-consensus/sort_x_y \
-		-O bam -@ 4 -l 1 -m 1G -o ${out_dir}/10-consensus/minimap.bam
 exit
 
 flye_root=/home/goshng/all/polap/Flye
@@ -57,23 +64,7 @@ mkdir -p \
 	${out_dir}/30-contigger \
 	${out_dir}/40-polishing
 
-# Stage: assembly
-# input1: ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
-# output: ${out_dir}/00-assembly/draft_assembly.fasta
-#
-bin/flye-modules assemble \
-	--reads ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz \
-	--out-asm ${out_dir}/00-assembly/draft_assembly.fasta \
-	--config ${flye_root}/flye/config/bin_cfg/asm_corrected_reads.cfg \
-	--log ${out_dir}/flye.log \
-	--threads 8 \
-	--debug \
-	--genome-size 500000 \
-	--min-ovlp 1000 \
-	--directional-reads
-
-exit
-
+# other data
 flye_root=/home/goshng/all/polap/Flye
 out_dir=${flye_root}/l-d
 mkdir -p \
@@ -96,26 +87,6 @@ bin/flye-modules assemble \
 
 exit
 
-# All
-rm -rf ${out_dir}
-bin/flye \
-	--pacbio-corr ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz \
-	--stop-after consensus \
-	--directional-reads \
-	--debug \
-	-g 500k -o $out_dir -t 8 -m 1000
-exit
-
-# folder preparation
-flye_root=/home/goshng/all/polap/Flye
-out_dir=${flye_root}/od
-mkdir -p \
-	${out_dir}/00-assembly \
-	${out_dir}/10-consensus \
-	${out_dir}/20-repeat \
-	${out_dir}/30-contigger \
-	${out_dir}/40-polishing
-
 # Stage: assembly
 # input1: ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
 # output: ${out_dir}/00-assembly/draft_assembly.fasta
@@ -137,7 +108,8 @@ bin/flye-modules assemble \
 #
 bin/flye-minimap2 \
 	${out_dir}/00-assembly/draft_assembly.fasta \
-	${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz -x map-pb -t 8 -a -p 0.5 -N 10 \
+	${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz \
+	-x map-pb -t 8 -a -p 0.5 -N 10 \
 	--sam-hit-only -L -K 1G -z 1000 -Q \
 	--secondary-seq -I 64G |
 	bin/flye-samtools view -T ${out_dir}/00-assembly/draft_assembly.fasta -u - |
@@ -154,6 +126,16 @@ exit
 # input1: ${out_dir}/10-consensus/minimap.bam
 # input1: ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
 # output: ${out_dir}/10-consensus/consensus.fasta
+
+# Filter out reverse-complementary reads
+bin/flye-minimap2 \
+	${out_dir}/00-assembly/draft_assembly.fasta \
+	${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz \
+	-x map-pb -t 8 -a -p 0.5 -N 10 \
+	--sam-hit-only -L -K 1G -z 1000 -Q \
+	--secondary-seq -I 64G |
+	bin/flye-samtools fastq -G 16 - >${out_dir}/00-assembly/forward.fq
+exit
 
 # Stage: repeat
 # input1: ${out_dir}/10-consensus/consensus.fasta
@@ -178,6 +160,7 @@ bin/flye-modules repeat \
 # input5: ${out_dir}/20-repeat/read_alignment_dump
 # output: ${out_dir}/30-contigger
 #
+mkdir -p ${out_dir}/30-contigger
 bin/flye-modules contigger \
 	--graph-edges ${out_dir}/20-repeat/repeat_graph_edges.fasta \
 	--reads ${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz \
@@ -190,6 +173,7 @@ bin/flye-modules contigger \
 	--debug \
 	--min-ovlp 1000 \
 	--directional-reads
+exit
 
 # Stage: polishing 1
 # input1: ${out_dir}/30-contigger/contigs.fasta

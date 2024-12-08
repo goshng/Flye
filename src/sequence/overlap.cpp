@@ -619,8 +619,14 @@ void OverlapContainer::findAllOverlaps() {
   // Logger::get().info() << "Finding overlaps:";
   std::vector<FastaRecord::Id> allQueries;
   for (const auto &seq : _queryContainer.iterSeqs()) {
-    if (seq.id.strand()) {
-      allQueries.push_back(seq.id);
+    // dflye:
+    if (_directionalReads) { // dflye: Check directionalReads
+      if (seq.id.strand()) { // dflye: Include only forward strand reads
+        allQueries.push_back(seq.id);
+      }
+    } else {
+      allQueries.push_back(
+          seq.id); // dflye: Include all reads if not directional
     }
   }
 

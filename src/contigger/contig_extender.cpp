@@ -41,7 +41,7 @@ void ContigExtender::generateUnbranchingPaths() {
     if (_directionalReads) {
       bool allForward = true;
       for (auto &edge : path.path) {
-        if (!edge->isForwardStrand()) {
+        if (!edge->isForward()) {
           allForward = false;
           break;
         }
