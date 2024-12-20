@@ -16,25 +16,25 @@ import json
 import shutil
 import subprocess
 
-import flye.polishing.alignment as aln
-import flye.polishing.polish as pol
-import flye.polishing.consensus as cons
-import flye.assembly.assemble as asm
-import flye.assembly.repeat_graph as repeat
-import flye.assembly.scaffolder as scf
-from flye.__version__ import __version__
-from flye.__build__ import __build__
-import flye.config.py_cfg as cfg
-from flye.config.configurator import setup_params, ConfigException
-from flye.utils.bytes2human import human2bytes, bytes2human
-from flye.utils.sam_parser import AlignmentException
-import flye.utils.fasta_parser as fp
+import dflye.polishing.alignment as aln
+import dflye.polishing.polish as pol
+import dflye.polishing.consensus as cons
+import dflye.assembly.assemble as asm
+import dflye.assembly.repeat_graph as repeat
+import dflye.assembly.scaffolder as scf
+from dflye.__version__ import __version__
+from dflye.__build__ import __build__
+import dflye.config.py_cfg as cfg
+from dflye.config.configurator import setup_params, ConfigException
+from dflye.utils.bytes2human import human2bytes, bytes2human
+from dflye.utils.sam_parser import AlignmentException
+import dflye.utils.fasta_parser as fp
 
-# import flye.short_plasmids.plasmids as plas
-# import flye.trestle.trestle as tres
-# import flye.trestle.graph_resolver as tres_graph
-from flye.repeat_graph.repeat_graph import RepeatGraph
-from flye.six.moves import range
+# import dflye.short_plasmids.plasmids as plas
+# import dflye.trestle.trestle as tres
+# import dflye.trestle.graph_resolver as tres_graph
+from dflye.repeat_graph.repeat_graph import RepeatGraph
+from dflye.six.moves import range
 
 if sys.version_info[0] == 2:
     raise Exception("Python 2 is unsupported")

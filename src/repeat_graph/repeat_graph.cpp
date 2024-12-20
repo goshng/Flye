@@ -129,9 +129,9 @@ void RepeatGraph::getGluepoints(OverlapContainer &asmOverlaps) {
   // first, extract endpoints from all overlaps.
   // each point has X and Y coordinates (curSeq and extSeq)
   for (auto &seq : _asmSeqs.iterSeqs()) {
+    if (_directionalReads && !seq.id.strand())
+      continue; // dflye: Skip reverse strand if directional
     for (auto &ovlp : asmOverlaps.lazySeqOverlaps(seq.id)) {
-      if (_directionalReads && !seq.id.strand())
-        continue; // dflye: Skip reverse strand if directional
       endpoints[ovlp.curId].push_back(new SetPoint2d(
           Point2d(ovlp.curId, ovlp.curBegin, ovlp.extId, ovlp.extBegin)));
       endpoints[ovlp.curId].push_back(new SetPoint2d(
@@ -170,9 +170,10 @@ void RepeatGraph::getGluepoints(OverlapContainer &asmOverlaps) {
     // first, simply add projections for each point from the cluster
     FastaRecord::Id clustSeq = clustEndpoints.second.front().curId;
 
-    // Skip reverse strand only if directional reads are enabled
-    if (_directionalReads && !clustSeq.strand())
-      continue; // dflye: Skip reverse strand if directional
+    // dflye: Do not change this!
+    // dflye: Do not check _directionalReads!
+    if (!clustSeq.strand())
+      continue;
 
     std::vector<int32_t> positions;
     for (auto &ep : clustEndpoints.second) {
@@ -408,8 +409,11 @@ void RepeatGraph::checkGluepointProjections(
 
     // for (auto& gp : _gluePoints)
     for (auto &seq : _asmSeqs.iterSeqs()) {
-      if (_directionalReads && !seq.id.strand())
-        continue; // dflye: Skip reverse strand if directional
+
+      // dflye: Do not check _directionalReads!
+      if (!seq.id.strand())
+        continue;
+
       if (!_gluePoints.count(seq.id))
         continue;
       auto &gp = _gluePoints[seq.id];
@@ -469,8 +473,9 @@ void RepeatGraph::checkGluepointProjections(
 
     int totalAdded = 0;
     for (auto &ptVec : addedGluepoints) {
-      if (_directionalReads && !ptVec.first.strand())
-        continue; // dflye: Skip reverse strand if directional
+      // dflye: Do not check _directionalReads!
+      if (!ptVec.first.strand())
+        continue;
 
       std::vector<size_t> permutation;
       for (size_t i = 0; i < ptVec.second.size(); ++i)
@@ -642,9 +647,10 @@ void RepeatGraph::initializeEdges(const OverlapContainer &asmOverlaps) {
   // for (auto& seqEdgesPair : _gluePoints)
   size_t checksum = 0;
   for (auto &seq : _asmSeqs.iterSeqs()) {
-    // dflye: Skip reverse strands when directional reads are enabled
-    if (_directionalReads && !seq.id.strand())
+    // dflye: do not check _directionalReads!
+    if (!seq.id.strand())
       continue;
+
     if (!_gluePoints.count(seq.id))
       continue;
     auto &seqGluepoints = _gluePoints[seq.id];
@@ -942,8 +948,8 @@ void RepeatGraph::logEdges() {
 
   // for (auto& seqEdgesPair : sequenceEdges)
   for (auto &seq : _asmSeqs.iterSeqs()) {
-    // dflye: Skip reverse strands when _directionalReads is enabled
-    if (_directionalReads && !seq.id.strand())
+    // dflye: do not check _directionalReads!
+    if (!seq.id.strand())
       continue;
 
     if (!sequenceEdges.count(seq.id))

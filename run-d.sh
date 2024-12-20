@@ -1,13 +1,61 @@
+flye_root=/home/goshng/all/polap/Flye
 # flye/tests/data/ecoli_500kb_reads.fastq.gz
 # reads_file=flye/tests/data/ecoli_500kb.fasta
 # reads_file=flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
 
+out_dir=${flye_root}/mt-d
+mt_fastq=/home/goshng/all/polap/revision1/Macadamia_tetraphylla/o/2/03-seeds/ptgaul/0.fq.gz
+mt_fastq=${flye_root}/mt/1.fq.gz
+mt_fastq=/home/goshng/all/polap/revision1/Macadamia_tetraphylla/o/2/04-subsample/ptgaul/3.fq.gz
+mt_fastq=/home/goshng/all/polap/revision1/Punica_granatum/o/3/04-subsample/ptgaul/0.fq.gz
+mt_fastq=/home/goshng/all/polap/revision1/Lolium_perenne/o/2/04-subsample/ptgaul/0.fq.gz
+mt_fastq=/home/goshng/all/polap/revision1/Lolium_perenne/o/2/03-seeds/ptgaul/12.fq.gz
+rm -rf ${out_dir}
+source $HOME/miniconda3/bin/activate polap
+flye \
+	--nano-raw ${mt_fastq} \
+	--debug \
+	--asm-coverage 30 \
+	-g 800000 -o $out_dir -t 56 -m 10000
+exit
+bin/flye \
+	--directional-reads
+
+--stop-after contigger
+
 flye_root=/home/goshng/all/polap/Flye
 out_dir=${flye_root}/o-d
 ecoli_hifi_fastq=${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
+hifi_fastq=${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
 both_fastq=${flye_root}/flye/tests/data/ecoli_500kb_reads_hifi.fastq.gz
 forward_fastq=${out_dir}/00-assembly/forward.fq
 forward_paf=${out_dir}/00-assembly/forward.paf
+
+# repeat graph with the forward filtered data
+out_dir=${flye_root}/mt
+disjointigs=${out_dir}/c0.fa
+both_fastq=${out_dir}/lk.fq.gz
+rm -rf ${out_dir}/20-repeat
+mkdir -p ${out_dir}/20-repeat
+bin/flye-modules repeat \
+	--disjointigs ${disjointigs} \
+	--reads ${both_fastq} \
+	--out-dir ${out_dir}/20-repeat \
+	--config ${flye_root}/flye/config/bin_cfg/asm_raw_reads.cfg \
+	--log ${out_dir}/flye.log \
+	--threads 8 \
+	--debug \
+	--min-ovlp 3000 \
+	--directional-reads
+exit
+
+rm -rf ${out_dir}
+bin/flye \
+	--pacbio-corr ${hifi_fastq} \
+	--debug \
+	--directional-reads \
+	-g 500k -o $out_dir -t 8 -m 1000
+exit
 
 # repeat graph with the forward filtered data
 rm -rf ${out_dir}/20-repeat

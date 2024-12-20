@@ -1,0 +1,3 @@
+# deleted for saving spaces in dflye
+flye/tests/data
+flye/config/bin_cfg/pacbio_chm13_homopolymers.mat

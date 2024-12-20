@@ -15,11 +15,11 @@ import logging
 import datetime
 from copy import copy
 
-import flye.utils.fasta_parser as fp
-from flye.utils.utils import which, get_median
-from flye.utils.sam_parser import AlignmentException
-from flye.six import iteritems
-from flye.six.moves import range
+import dflye.utils.fasta_parser as fp
+from dflye.utils.utils import which, get_median
+from dflye.utils.sam_parser import AlignmentException
+from dflye.six import iteritems
+from dflye.six.moves import range
 
 
 logger = logging.getLogger()
