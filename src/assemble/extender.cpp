@@ -315,13 +315,22 @@ void Extender::assembleDisjointigs() {
     std::lock_guard<std::mutex> guard(indexMutex);
 
     // cFlye:
+    // consider:
+    // max_coverage_drop_rate
+    // min_reads_in_disjointig
+    // max_inner_reads
+    // max_inner_fraction
+    // graph_cov_drop_rate
+    // min_read_cov_cutoff
+    //
     // Compute average coverage after acquiring mutex
     float avgCoverage = calculateAverageCoverage(exInfo);
     /*if (avgCoverage < Config::get("min_disjointig_coverage")) {*/
-    /*  Logger::get().debug()*/
-    /*      << "Discarded disjointig due to low coverage: " << avgCoverage;*/
-    /*  return;*/
-    /*}*/
+    if (avgCoverage < 4) {
+      Logger::get().debug()
+          << "Discarded disjointig due to low coverage: " << avgCoverage;
+      return;
+    }
     // cFlye:
 
     /*if (exInfo.reads.size() - exInfo.numSuspicious <
