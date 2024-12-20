@@ -43,6 +43,23 @@ OverlapRange getOverlapBetween(OverlapContainer &ovlpCnt,
 }
 } // namespace
 
+// cflye:
+float Extender::calculateAverageCoverage(const ExtensionInfo &exInfo) const {
+  // Sum the lengths of all reads in the disjointig
+  int64_t totalReadLength = 0;
+  for (const auto &readId : exInfo.reads) {
+    totalReadLength += _readsContainer.seqLen(readId);
+  }
+
+  // Use the assembled length of the disjointig
+  if (exInfo.assembledLength == 0) {
+    throw std::runtime_error("Disjointig length cannot be zero.");
+  }
+
+  return static_cast<float>(totalReadLength) / exInfo.assembledLength;
+}
+// cflye:
+
 Extender::ExtensionInfo Extender::extendDisjointig(FastaRecord::Id startRead) {
 
   std::unordered_set<FastaRecord::Id> currentReads;
@@ -180,9 +197,11 @@ Extender::ExtensionInfo Extender::extendDisjointig(FastaRecord::Id startRead) {
       overlapSizes.push_back(selectedExtension->curRange());
 
       //_chimDetector.isRepetitiveRegion(selectedExtension->curId,
-      //selectedExtension->curBegin, 								 selectedExtension->curEnd, true);
+      // selectedExtension->curBegin,
+      // selectedExtension->curEnd, true);
       //_chimDetector.isRepetitiveRegion(selectedExtension->extId,
-      //selectedExtension->extBegin, 								 selectedExtension->extEnd, true);
+      // selectedExtension->extBegin,
+      // selectedExtension->extEnd, true);
     } else {
       rightExtension ? exInfo.leftTip = true : exInfo.rightTip = true;
     }
@@ -295,6 +314,16 @@ void Extender::assembleDisjointigs() {
     // Exclusive part - updating the overall assembly
     std::lock_guard<std::mutex> guard(indexMutex);
 
+    // cFlye:
+    // Compute average coverage after acquiring mutex
+    float avgCoverage = calculateAverageCoverage(exInfo);
+    /*if (avgCoverage < Config::get("min_disjointig_coverage")) {*/
+    /*  Logger::get().debug()*/
+    /*      << "Discarded disjointig due to low coverage: " << avgCoverage;*/
+    /*  return;*/
+    /*}*/
+    // cFlye:
+
     /*if (exInfo.reads.size() - exInfo.numSuspicious <
             (size_t)Config::get("min_reads_in_disjointig"))
     {
@@ -334,6 +363,7 @@ void Extender::assembleDisjointigs() {
                           << "\n\tAvg overlap len: " << exInfo.avgOverlapSize
                           << "\n\tMin overlap len: " << exInfo.minOverlapSize
                           << "\n\tInner reads: " << innerCount
+                          << "\n\tRead coverage: " << avgCoverage
                           << "\n\tLength: " << exInfo.assembledLength;
 
     // Logger::get().debug() << "Ovlp index size: " <<
@@ -503,8 +533,9 @@ void Extender::convertToDisjointigs() {
     }
     // path.trimLeft = std::max(0, exInfo.leftAsmOverlap -
     //							2 *
-    //Parameters::get().minimumOverlap); path.trimRight = std::max(0,
-    // exInfo.rightAsmOverlap - 							 2 * Parameters::get().minimumOverlap);
+    // Parameters::get().minimumOverlap); path.trimRight = std::max(0,
+    // exInfo.rightAsmOverlap -
+    // 2 * Parameters::get().minimumOverlap);
 
     for (size_t i = 0; i < exInfo.reads.size() - 1; ++i) {
       auto readsOvlp = getOverlapBetween(_ovlpContainer, exInfo.reads[i],

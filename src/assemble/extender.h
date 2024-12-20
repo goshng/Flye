@@ -59,6 +59,7 @@ private:
   void convertToDisjointigs();
   std::vector<FastaRecord::Id>
   getInnerReads(const std::vector<OverlapRange> &ovlps);
+  float calculateAverageCoverage(const ExtensionInfo &exInfo) const;
 
   const SequenceContainer &_readsContainer;
   OverlapContainer &_ovlpContainer;
