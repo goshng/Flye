@@ -1,5 +1,7 @@
 o
 o-d
+mt
+mt-d
 trash
 *.fastq
 *.fasta
@@ -13,6 +15,10 @@ l.fq
 *.so
 *.DS_Store
 *.egg-info
+*.png
+bin/dflye-minimap2
+bin/dflye-modules
+bin/dflye-samtools
 build
 dist
 
