@@ -25,18 +25,18 @@ endif
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-${BIN_DIR}/aflye-minimap2: $(BUILD_DIR)
+${BIN_DIR}/cflye-minimap2: $(BUILD_DIR)
 	make -C ${MINIMAP2_DIR} -j ${THREADS}
-	cp ${MINIMAP2_DIR}/minimap2 ${BIN_DIR}/aflye-minimap2
+	cp ${MINIMAP2_DIR}/minimap2 ${BIN_DIR}/cflye-minimap2
 
-minimap2: ${BIN_DIR}/aflye-minimap2
+minimap2: ${BIN_DIR}/cflye-minimap2
 
-samtools: ${BIN_DIR}/aflye-samtools
+samtools: ${BIN_DIR}/cflye-samtools
 
-${BIN_DIR}/aflye-samtools: $(BUILD_DIR)
+${BIN_DIR}/cflye-samtools: $(BUILD_DIR)
 	cd ${SAMTOOLS_DIR} && ./configure --without-curses --disable-bz2 --disable-lzma --enable-plugins
 	make samtools -C ${SAMTOOLS_DIR} -j ${THREADS}
-	cp ${SAMTOOLS_DIR}/samtools ${BIN_DIR}/aflye-samtools
+	cp ${SAMTOOLS_DIR}/samtools ${BIN_DIR}/cflye-samtools
 
 all: $(BUILD_DIR) minimap2 samtools
 	make release -C src -j ${THREADS} BUILD_DIR=$(BUILD_DIR)
@@ -52,7 +52,7 @@ clean:
 	make clean -C ${MINIMAP2_DIR}
 	make clean-all -C ${SAMTOOLS_DIR}
 	rm -rf ${BUILD_DIR}
-	rm -f ${BIN_DIR}/aflye-minimap2
-	rm -f ${BIN_DIR}/aflye-samtools
+	rm -f ${BIN_DIR}/cflye-minimap2
+	rm -f ${BIN_DIR}/cflye-samtools
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
