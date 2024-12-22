@@ -54,4 +54,5 @@ clean:
 	rm -rf ${BUILD_DIR}
 	rm -f ${BIN_DIR}/flye-minimap2
 	rm -f ${BIN_DIR}/flye-samtools
-
+	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete
