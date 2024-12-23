@@ -10,9 +10,9 @@ from __future__ import absolute_import
 from __future__ import division
 import logging
 
-import flye.utils.fasta_parser as fp
-import flye.config.py_cfg as cfg
-from flye.six import iteritems
+import dflye.utils.fasta_parser as fp
+import dflye.config.py_cfg as cfg
+from dflye.six import iteritems
 
 
 logger = logging.getLogger()
