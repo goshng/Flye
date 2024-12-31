@@ -326,7 +326,7 @@ void Extender::assembleDisjointigs() {
     // Compute average coverage after acquiring mutex
     float avgCoverage = calculateAverageCoverage(exInfo);
     /*if (avgCoverage < Config::get("min_disjointig_coverage")) {*/
-    if (avgCoverage < 4) {
+    if (avgCoverage < _minDisjointigCoverage) {
       Logger::get().debug()
           << "Discarded disjointig due to low coverage: " << avgCoverage;
       return;

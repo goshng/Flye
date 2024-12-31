@@ -3,6 +3,7 @@
 // Released under the BSD license (see LICENSE file)
 
 #include <cmath>
+#include <cstdlib>
 #include <execinfo.h>
 #include <iostream>
 #include <signal.h>
@@ -27,13 +28,14 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
                size_t &genomeSize, int &kmerSize, bool &debug,
                size_t &numThreads, int &minOverlap, std::string &configPath,
                int &minReadLength, bool &unevenCov, std::string &extraParams,
-               bool &shortMode) {
+               bool &shortMode, double &minDisjointigCoverage) {
   auto printUsage = []() {
     std::cerr
         << "Usage: flye-assemble "
         << " --reads path --out-asm path --config path [--genome-size size]\n"
         << "\t\t[--min-read length] [--log path] [--treads num] "
            "[--extra-params]\n"
+        << " --disjointig-min-coverage <float>\n"
         << "\t\t[--kmer size] [--meta] [--short] [--min-ovlp size] [--debug] "
            "[-h]\n\n"
         << "Required arguments:\n"
@@ -61,20 +63,22 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
   };
 
   int optionIndex = 0;
-  static option longOptions[] = {{"reads", required_argument, 0, 0},
-                                 {"out-asm", required_argument, 0, 0},
-                                 {"genome-size", required_argument, 0, 0},
-                                 {"config", required_argument, 0, 0},
-                                 {"min-read", required_argument, 0, 0},
-                                 {"log", required_argument, 0, 0},
-                                 {"threads", required_argument, 0, 0},
-                                 {"kmer", required_argument, 0, 0},
-                                 {"min-ovlp", required_argument, 0, 0},
-                                 {"extra-params", required_argument, 0, 0},
-                                 {"meta", no_argument, 0, 0},
-                                 {"short", no_argument, 0, 0},
-                                 {"debug", no_argument, 0, 0},
-                                 {0, 0, 0, 0}};
+  static option longOptions[] = {
+      {"reads", required_argument, 0, 0},
+      {"out-asm", required_argument, 0, 0},
+      {"genome-size", required_argument, 0, 0},
+      {"config", required_argument, 0, 0},
+      {"min-read", required_argument, 0, 0},
+      {"log", required_argument, 0, 0},
+      {"threads", required_argument, 0, 0},
+      {"kmer", required_argument, 0, 0},
+      {"min-ovlp", required_argument, 0, 0},
+      {"extra-params", required_argument, 0, 0},
+      {"meta", no_argument, 0, 0},
+      {"short", no_argument, 0, 0},
+      {"debug", no_argument, 0, 0},
+      {"disjointig-min-coverage", required_argument, 0, 0},
+      {0, 0, 0, 0}};
 
   int opt = 0;
   while ((opt = getopt_long(argc, argv, "h", longOptions, &optionIndex)) !=
@@ -89,6 +93,9 @@ bool parseArgs(int argc, char **argv, std::string &readsFasta,
         numThreads = atoi(optarg);
       else if (!strcmp(longOptions[optionIndex].name, "min-ovlp"))
         minOverlap = atoi(optarg);
+      else if (!strcmp(longOptions[optionIndex].name,
+                       "disjointig-min-coverage"))
+        minDisjointigCoverage = atof(optarg);
       else if (!strcmp(longOptions[optionIndex].name, "log"))
         logFile = optarg;
       else if (!strcmp(longOptions[optionIndex].name, "debug"))
@@ -152,9 +159,9 @@ void removeContainedDisjointigs(std::vector<FastaRecord> &disjointigs,
     for (auto &ovlp : disjOverlaps.lazySeqOverlaps(seq.id)) {
       // Logger::get().debug() << disjSequences.seqName(ovlp.curId) << " " <<
       // ovlp.curLen << " " << 	ovlp.curBegin << " " << ovlp.curEnd << " " <<
-      //disjSequences.seqName(ovlp.extId)
+      // disjSequences.seqName(ovlp.extId)
       //	<< " " << ovlp.extLen << " " << ovlp.extBegin << " " <<
-      //ovlp.extEnd;
+      // ovlp.extEnd;
 
       bool contained =
           (std::max(ovlp.curBegin, ovlp.curLen - ovlp.curEnd) < FLANK) ||
@@ -191,6 +198,7 @@ int assemble_main(int argc, char **argv) {
   bool unevenCov = false;
   size_t numThreads = 1;
   bool shortMode = false;
+  double minDisjointigCoverage = 0.1;
   std::string readsFasta;
   std::string outAssembly;
   std::string logFile;
@@ -199,7 +207,8 @@ int assemble_main(int argc, char **argv) {
 
   if (!parseArgs(argc, argv, readsFasta, outAssembly, logFile, genomeSize,
                  kmerSize, debugging, numThreads, minOverlap, configPath,
-                 minReadLength, unevenCov, extraParams, shortMode))
+                 minReadLength, unevenCov, extraParams, shortMode,
+                 minDisjointigCoverage))
     return 1;
 
   Logger::get().setDebugging(debugging);
@@ -208,6 +217,8 @@ int assemble_main(int argc, char **argv) {
   Logger::get().debug() << "Build date: " << __DATE__ << " " << __TIME__;
   std::ios::sync_with_stdio(false);
 
+  Logger::get().info() << "Minimum coverage for filtering disjointigs: "
+                       << minDisjointigCoverage;
   Logger::get().debug() << "Total RAM: " << getMemorySize() / 1024 / 1024 / 1024
                         << " Gb";
   Logger::get().debug() << "Available RAM: "
@@ -276,8 +287,8 @@ int assemble_main(int argc, char **argv) {
     vertexIndex.buildIndexUnevenCoverage(MIN_FREQ, SELECT_RATE, TANDEM_FREQ);
   }
 
-  Logger::get().debug() << "Peak RAM usage: "
-                        << getPeakRSS() / 1024 / 1024 / 1024 << " Gb";
+  Logger::get().info() << "Peak RAM usage: "
+                       << getPeakRSS() / 1024 / 1024 / 1024 << " Gb";
 
   // int maxOverlapsNum = !Parameters::get().unevenCoverage ? 5 * coverage : 0;
   OverlapDetector ovlp(
@@ -294,6 +305,7 @@ int assemble_main(int argc, char **argv) {
       (bool)Config::get("assemble_divergence_relative"));
 
   Extender extender(readsContainer, readOverlaps, minOverlap);
+  extender.setMinDisjointigCoverage(minDisjointigCoverage);
   extender.assembleDisjointigs();
   vertexIndex.clear();
 
@@ -307,8 +319,8 @@ int assemble_main(int argc, char **argv) {
   //}
   SequenceContainer::writeFasta(disjointigsFasta, outAssembly);
 
-  Logger::get().debug() << "Peak RAM usage: "
-                        << getPeakRSS() / 1024 / 1024 / 1024 << " Gb";
+  Logger::get().info() << "Peak RAM usage: "
+                       << getPeakRSS() / 1024 / 1024 / 1024 << " Gb";
 
   return 0;
 }

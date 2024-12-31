@@ -220,8 +220,8 @@ int contigger_main(int argc, char **argv) {
                    outFolder + "/graph_final.gfa");
   extender.appendGfaPaths(outFolder + "/graph_final.gfa");
 
-  Logger::get().debug() << "Peak RAM usage: "
-                        << getPeakRSS() / 1024 / 1024 / 1024 << " Gb";
+  Logger::get().info() << "Peak RAM usage: "
+                       << getPeakRSS() / 1024 / 1024 / 1024 << " Gb";
 
   return 0;
 }

@@ -17,8 +17,12 @@ public:
            OverlapContainer &ovlpContainer, int safeOverlap)
       : _safeOverlap(safeOverlap), _readsContainer(readsContainer),
         _ovlpContainer(ovlpContainer),
-        _chimDetector(readsContainer, ovlpContainer) {}
+        _chimDetector(readsContainer, ovlpContainer),
+        _minDisjointigCoverage(0.1) {}
 
+  void setMinDisjointigCoverage(double minDisjointigCoverage) {
+    _minDisjointigCoverage = minDisjointigCoverage;
+  }
   void assembleDisjointigs();
   const std::vector<ContigPath> &getDisjointigPaths() const {
     return _disjointigPaths;
@@ -68,4 +72,5 @@ private:
   std::vector<ExtensionInfo> _readLists;
   std::vector<ContigPath> _disjointigPaths;
   cuckoohash_map<FastaRecord::Id, size_t> _innerReads;
+  double _minDisjointigCoverage;
 };

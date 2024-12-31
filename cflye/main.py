@@ -638,6 +638,7 @@ def _usage():
         "\t     [--keep-haplotypes] [--debug] [--version] [--help] \n"
         "\t     [--scaffold] [--resume] [--resume-from] [--stop-after] \n"
         "\t     [--read-error float] [--extra-params] \n"
+        "\t     [--disjointig-min-coverage float]\n"
         "\t     [--deterministic]"
     )
 
@@ -818,6 +819,14 @@ def main():
         metavar="float",
         default=None,
         help="adjust parameters for given read error rate (as fraction e.g. 0.03)",
+        type=float,
+    )
+    parser.add_argument(
+        "--disjointig-min-coverage",
+        dest="disjointig_min_coverage",
+        metavar="float",
+        default=0.1,
+        help="parameter for disjointig filtering (as fraction e.g. 0.1)",
         type=float,
     )
     parser.add_argument(

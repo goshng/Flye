@@ -51,6 +51,8 @@ def assemble(args, run_params, out_file, log_file, config_path):
         log_file,
         "--threads",
         str(1 if args.deterministic else args.threads),
+        "--disjointig-min-coverage",
+        str(args.disjointig_min_coverage),
     ]
     if args.debug:
         cmdline.append("--debug")

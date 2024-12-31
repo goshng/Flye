@@ -291,8 +291,8 @@ int repeat_main(int argc, char **argv) {
                                 outFolder + "/repeat_graph_edges.fasta",
                                 /*only pos strand*/ true);
 
-  Logger::get().debug() << "Peak RAM usage: "
-                        << getPeakRSS() / 1024 / 1024 / 1024 << " Gb";
+  Logger::get().info() << "Peak RAM usage: "
+                       << getPeakRSS() / 1024 / 1024 / 1024 << " Gb";
 
   return 0;
 }
