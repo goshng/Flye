@@ -7,7 +7,6 @@ o
 *.DS_Store
 *.egg-info
 data
-bin_cfg
 trash
 o
 o-d
