@@ -41,7 +41,8 @@ from dflye.utils.utils import get_median
 
 logger = logging.getLogger()
 
-SAMTOOLS_BIN = "flye-samtools"
+# goshng: 2025-06-14
+SAMTOOLS_BIN = "dflye-samtools"
 Alignment = namedtuple(
     "Alignment",
     [

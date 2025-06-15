@@ -23,8 +23,8 @@ from dflye.six.moves import range
 
 
 logger = logging.getLogger()
-MINIMAP_BIN = "flye-minimap2"
-SAMTOOLS_BIN = "flye-samtools"
+MINIMAP_BIN = "dflye-minimap2"
+SAMTOOLS_BIN = "dflye-samtools"
 
 ContigInfo = namedtuple("ContigInfo", ["id", "length", "type"])
 
