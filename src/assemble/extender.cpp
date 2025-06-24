@@ -11,6 +11,7 @@
 #include "../common/config.h"
 #include "../common/logger.h"
 #include "../common/parallel.h"
+#include "../sequence/sequence.h"
 #include "extender.h"
 
 namespace {
@@ -221,6 +222,10 @@ Extender::ExtensionInfo Extender::extendDisjointig(FastaRecord::Id startRead) {
 
       // right extension done, try to extend left from start read
       if (rightExtension && !exInfo.reads.empty()) {
+        // dflye:
+        if (_directionalReads)
+          break; // disable left extension
+
         exInfo.stepsToTurn = exInfo.reads.size();
         rightExtension = false;
         currentRead = exInfo.reads.front().rc();
@@ -405,6 +410,12 @@ void Extender::assembleDisjointigs() {
         }
       }
     }
+    if (_directionalReads) {
+      for (const auto &ovlp : allOverlaps) {
+        assert(ovlp.curStrand == ovlp.extStrand &&
+               "Strand mismatch in disjointig overlaps!");
+      }
+    }
 
     auto innerReads = this->getInnerReads(allOverlaps);
     for (const auto &read : innerReads) {
@@ -569,10 +580,25 @@ void Extender::convertToDisjointigs() {
       auto readsOvlp =
           getOverlapBetween(_ovlpContainer, exInfo.reads[i],
                             exInfo.reads[i + 1], _directionalReads);
-      path.sequences.push_back(_readsContainer.getSeq(exInfo.reads[i]));
+
+      // dflye:
+      // path.sequences.push_back(_readsContainer.getSeq(exInfo.reads[i]));
+      auto seq = _readsContainer.getSeq(exInfo.reads[i]);
+      if (_directionalReads && !exInfo.reads[i].strand()) {
+        seq = seq.complement(); // flip sequence to forward strand
+      }
+      path.sequences.push_back(std::move(seq));
+
       path.overlaps.push_back(readsOvlp);
     }
-    path.sequences.push_back(_readsContainer.getSeq(exInfo.reads.back()));
+    // dflye:
+    // path.sequences.push_back(_readsContainer.getSeq(exInfo.reads.back()));
+    auto lastSeq = _readsContainer.getSeq(exInfo.reads.back());
+    if (_directionalReads && !exInfo.reads.back().strand()) {
+      lastSeq = lastSeq.complement(); // or lastSeq = lastSeq.complement();
+    }
+    path.sequences.push_back(std::move(lastSeq));
+
     _disjointigPaths.push_back(std::move(path));
   }
 }

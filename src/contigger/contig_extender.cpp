@@ -47,6 +47,9 @@ void ContigExtender::generateUnbranchingPaths() {
         }
       }
       if (!allForward) {
+        Logger::get().debug()
+            << "Skipping UPath due to reverse edges: " << path.id.signedId()
+            << ": " << path.edgesStr();
         continue; // Skip paths with reverse-strand edges
       }
     }
@@ -264,13 +267,40 @@ void ContigExtender::generateContigs() {
 std::vector<UnbranchingPath *> ContigExtender::asUpaths(const GraphPath &path) {
   std::vector<UnbranchingPath *> upathRepr;
   for (size_t i = 0; i < path.size(); ++i) {
-    UnbranchingPath *upath = _edgeToPath.at(path[i]);
 
-    // dflye: Skip reverse-strand paths if directional reads are enabled
+    // // dflye: You should guard access to at() like this:
+    // auto it = _edgeToPath.find(path[i]);
+    // if (it == _edgeToPath.end()) {
+    //   Logger::get().warning()
+    //       << "Edge not mapped to any UnbranchingPath: " << path[i]->edgeId;
+    //   continue; // skip unmapped edges
+    // }
+    //
+    // UnbranchingPath *upath = _edgeToPath.at(path[i]);
+    //
+    // // dflye: Skip reverse-strand paths if directional reads are enabled
+    // if (_directionalReads && !upath->id.strand()) {
+    //   continue;
+    // }
+    // // dflye: End of directional read filtering
+    //
+    // if (upathRepr.empty() || upathRepr.back() != upath ||
+    //     path[i - 1] == path[i]) {
+    //   upathRepr.push_back(upath);
+    // }
+
+    auto it = _edgeToPath.find(path[i]);
+    if (it == _edgeToPath.end()) {
+      Logger::get().warning()
+          << "Edge not found in _edgeToPath: " << path[i]->edgeId
+          << " Skipping.";
+      continue;
+    }
+    UnbranchingPath *upath = it->second;
+
     if (_directionalReads && !upath->id.strand()) {
       continue;
     }
-    // dflye: End of directional read filtering
 
     if (upathRepr.empty() || upathRepr.back() != upath ||
         path[i - 1] == path[i]) {

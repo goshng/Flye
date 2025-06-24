@@ -463,6 +463,10 @@ OverlapDetector::getSeqOverlaps(const FastaRecord &fastaRec, bool forceLocal,
       }
 
       if (ovlp.seqDivergence < _maxDivergence) {
+        // ** DIRECTIONAL READS: SET STRANDS **
+        ovlp.curStrand = fastaRec.id.strand();
+        ovlp.extStrand = extId.strand();
+        // dflye: END
         detectedOverlaps.push_back(ovlp);
       }
       // if alignment not passing thrshold, check if its parts do
@@ -471,6 +475,10 @@ OverlapDetector::getSeqOverlaps(const FastaRecord &fastaRec, bool forceLocal,
             ovlp, fastaRec.sequence, _seqContainer.getSeq(extId),
             _maxDivergence, _minOverlap, _useHpc);
         for (auto &trimOvlp : trimmedOverlaps) {
+          // ** DIRECTIONAL READS: SET STRANDS **
+          trimOvlp.curStrand = fastaRec.id.strand();
+          trimOvlp.extStrand = extId.strand();
+          // dflye: END
           detectedOverlaps.push_back(trimOvlp);
         }
       }

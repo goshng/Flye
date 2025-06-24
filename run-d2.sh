@@ -8,20 +8,23 @@ out_dir=${flye_root}/mt-d
 mt_fastq=/home/goshng/all/polap/aflye1/Macadamia_tetraphylla/o/2/03-seeds/ptgaul/0.fq.gz
 mt_fastq=${flye_root}/mt/1.fq.gz
 mt_fastq=/home/goshng/all/polap/aflye1/Macadamia_tetraphylla/o/2/04-subsample/ptgaul/3.fq.gz
-mt_fastq=/home/goshng/all/polap/aflye1/Lolium_perenne/o/2/04-subsample/ptgaul/0.fq.gz
 mt_fastq=/home/goshng/all/polap/aflye1/Punica_granatum/o/3/04-subsample/ptgaul/0.fq.gz
 mt_fastq=/home/goshng/all/polap/aflye1/Punica_granatum/o/3/03-seeds/ptgaul/0.fq.gz
 mt_fastq=/home/goshng/8.fq.gz
 mt_fastq=/home/goshng/1.fq.gz
 mt_fastq=/home/goshng/all/polap/aflye1-delete/Lolium_perenne/o/2/03-seeds/ptgaul/12.fq.gz
 mt_fastq=/home/goshng/1.fq.gz
+mt_fastq=/home/goshng/all/polap/aflye1/Lolium_perenne/o/2/04-subsample/ptgaul/0.fq.gz
+# ls -l "${mt_fastq}"
+# exit
+mt_fastq=/home/goshng/4.fq.gz
 rm -rf ${out_dir}
 # source $HOME/miniconda3/bin/activate polap
 bin/dflye \
 	--nano-raw ${mt_fastq} \
 	--asm-coverage 30 \
 	--directional-reads \
-	-g 250000 -o $out_dir -t 56
+	-g 800000 -o $out_dir -t 56
 exit
 -g 800000 -o $out_dir -t 56 -m 10000
 /home/goshng/all/polap/Flye/bin/dflye \
